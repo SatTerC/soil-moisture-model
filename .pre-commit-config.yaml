@@ -1,0 +1,10 @@
+repos:
+  - repo: local
+    hooks:
+      - id: just
+        name: just
+        language: system
+        pass_filenames: false
+        entry: just lint test typecheck
+        stages: [pre-commit]
+        verbose: true

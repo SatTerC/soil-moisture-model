@@ -1,0 +1,13 @@
+.envrc
+.venv/
+site/
+__pycache__/
+.coverage
+*.pyc
+__pycache__/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.DS_Store

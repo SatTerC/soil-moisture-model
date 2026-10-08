@@ -5,6 +5,11 @@ _:
 # Format and lint the package using ruff.
 lint:
   ruff format
+  ruff check --fix
+
+# Variant of `lint` that doesn't cause any changes to files.
+lint-check:
+  ruff format --check
   ruff check
 
 # Run the test suite.

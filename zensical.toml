@@ -1,12 +1,12 @@
 [project]
 site_name = "Soil Moisture Model"
-site_description = "A Python package"
-site_author = "Your Name"
+site_description = "A reduced-complexity weekly bucket model of soil moisture"
+site_author = "vmyrgiotis, jmarshrossney"
 
 site_url = "https://SatTerC.github.io/soil-moisture-model"
 repo_name = "SatTerC/soil-moisture-model"
 repo_url = "https://github.com/SatTerC/soil-moisture-model"
-copyright = "Copyright &copy; 2026 Your Name"
+copyright = "Copyright &copy; 2026 vmyrgiotis, jmarshrossney"
 
 use_directory_urls = false
 

@@ -67,6 +67,7 @@ Notes
 
 from dataclasses import dataclass, fields, replace
 from typing import Dict, Optional, Sequence
+
 import numpy as np
 import pandas as pd
 
@@ -307,4 +308,4 @@ def simulate_soil_water_balance(
         cols = [date_col] + [c for c in df.columns if c != date_col]
         df = df[cols]
 
-    return df
+    return df  # pyright: ignore[reportReturnType]  # TEMPORARY until Stage 2

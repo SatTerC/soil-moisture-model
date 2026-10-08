@@ -5,13 +5,17 @@ build-backend = "uv_build"
 [project]
 name = "soil_moisture_model"
 version = "0.1.0"
-description = "A Python package"
+description = "A reduced-complexity weekly bucket model of soil moisture, driven by temperature, precipitation and plant biomass."
 readme = "README.md"
 authors = [
-    { name = "Your Name", email = "vasmyr@ceh.ac.uk" }
+    { name = "vmyrgiotis", email = "vasmyr@ceh.ac.uk" },
+    { name = "jmarshrossney", email = "17361029+jmarshrossney@users.noreply.github.com" },
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "numpy>=2.4.2",
+    # TEMPORARY: legacy main.py needs pandas; removed in the numpy refactor
+    "pandas>=2.2",
 ]
 
 [dependency-groups]
@@ -28,6 +32,7 @@ docs = [
     "zensical>=0.0.24",
 ]
 test = [
+    "hypothesis>=6.0",
     "pytest>=9.0.2",
     "pytest-cov>=6.0",
 ]
@@ -39,13 +44,30 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = [
+    "E",   # pycodestyle errors
     "D",   # pydocstyle
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific rules
+    "PT",  # flake8-pytest-style
+    "I",   # isort
 ]
 
 [tool.ruff.lint.per-file-ignores]
 # Except tests and scripts from docstring requirements
-"tests/**" = ["D"]
+"tests/**" = ["D", "E501"]
 "scripts/**" = ["D"]
+# TEMPORARY: legacy code awaiting refactor (Stage 2: main.py; Stage 5: calibrate_icos.py)
+"src/soil_moisture_model/main.py" = ["D", "UP", "B", "RUF"]
+"scripts/calibrate_icos.py" = ["E501", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+include = ["src/", "tests/"]

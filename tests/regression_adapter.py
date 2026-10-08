@@ -5,31 +5,54 @@ update this adapter, not the fixtures.
 """
 
 import numpy as np
-import pandas as pd
 
-from soil_moisture_model import SoilWaterParams, simulate_soil_water_balance
+from soil_moisture_model import SoilWaterParams, simulate
 
-SITE_OUTPUTS = (
-    "soil_water_capacity_mm",
-    "drainage_coeff",
-    "runoff_fraction_max",
-    "stress_exponent",
-)
+# legacy SoilWaterParams field -> current SoilWaterParams field
+PARAM_NAMES = {
+    "base_soil_water_capacity_mm": "base_soil_water_capacity",
+    "base_drainage_coeff": "base_drainage_coefficient",
+    "base_runoff_fraction_max": "base_max_runoff_fraction",
+    "runoff_exponent": "runoff_exponent",
+    "field_capacity_fraction": "field_capacity_fraction",
+    "reference_clay_pct": "reference_clay",
+    "clay_sensitivity": "clay_sensitivity",
+    "pet_coeff_mm_per_degday": "pet_coefficient",
+    "biomass_half_sat_gC_m2": "biomass_half_saturation",
+}
 
 
 def run_scenario(inputs: dict) -> dict[str, np.ndarray]:
-    df = simulate_soil_water_balance(
-        pd.DataFrame(
-            {
-                "temp_c": inputs["temp_c"],
-                "precip_mm": inputs["precip_mm"],
-                "biomass_gC_m2": inputs["biomass_gC_m2"],
-            }
-        ),
-        elevation_m=float(inputs["elevation_m"]),
-        clay_pct=float(inputs["clay_pct"]),
-        params=SoilWaterParams(**inputs["params"]),
+    legacy_params = dict(inputs["params"])
+    initial = legacy_params.pop("initial_soil_moisture_mm", 50.0)
+    params = SoilWaterParams(**{PARAM_NAMES[k]: v for k, v in legacy_params.items()})
+    out = simulate(
+        inputs["temp_c"],
+        inputs["precip_mm"],
+        inputs["biomass_gC_m2"],
+        float(inputs["elevation_m"]),
+        float(inputs["clay_pct"]),
+        initial_soil_moisture=initial,
+        params=params,
     )
-    out = {k: df[k].to_numpy() for k in df.columns if k not in SITE_OUTPUTS}
-    out.update({k: np.asarray(df[k].iloc[0]) for k in SITE_OUTPUTS})
-    return out
+    return {
+        "base_pet_mm": out.reference_evapotranspiration,
+        "kc": out.crop_coefficient,
+        "biomass_uptake_factor": out.uptake_factor,
+        "interception_capacity_mm": out.interception_capacity,
+        "intercepted_mm": out.interception,
+        "throughfall_mm": out.throughfall,
+        "frozen_soil": out.frozen,
+        "et_potential_mm": out.potential_evapotranspiration,
+        "water_stress": out.water_stress,
+        "et_actual_mm": out.actual_evapotranspiration,
+        "total_evaporative_loss_mm": out.total_evaporative_loss,
+        "runoff_mm": out.runoff,
+        "drainage_mm": out.drainage,
+        "soil_moisture_mm": out.soil_moisture,
+        "relative_soil_moisture": out.relative_soil_moisture,
+        "soil_water_capacity_mm": out.soil.soil_water_capacity,
+        "drainage_coeff": out.soil.drainage_coefficient,
+        "runoff_fraction_max": out.soil.max_runoff_fraction,
+        "stress_exponent": out.soil.stress_exponent,
+    }

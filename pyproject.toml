@@ -14,8 +14,6 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "numpy>=2.4.2",
-    # TEMPORARY: legacy main.py needs pandas; removed in the numpy refactor
-    "pandas>=2.2",
 ]
 
 [dependency-groups]
@@ -60,8 +58,7 @@ select = [
 # Except tests and scripts from docstring requirements
 "tests/**" = ["D", "E501"]
 "scripts/**" = ["D"]
-# TEMPORARY: legacy code awaiting refactor (Stage 2: main.py; Stage 5: calibrate_icos.py)
-"src/soil_moisture_model/main.py" = ["D", "UP", "B", "RUF"]
+# TEMPORARY: legacy code awaiting refactor
 "scripts/calibrate_icos.py" = ["E501", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.ruff.lint.pydocstyle]

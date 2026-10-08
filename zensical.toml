@@ -10,14 +10,25 @@ copyright = "Copyright &copy; 2026 vmyrgiotis, jmarshrossney"
 
 use_directory_urls = false
 
+nav = [
+    { "Home" = "index.md" },
+    { "Science" = "science.md" },
+    { "API Reference" = [
+        "API_Reference/model.md",
+        "API_Reference/params.md",
+        "API_Reference/processes.md",
+        "API_Reference/constants.md",
+    ] },
+]
+
 # Katex
 extra_javascript = [
     "_static/js/katex.js",
-    "https://unpkg.com/katex@0/dist/katex.min.js",
-    "https://unpkg.com/katex@0/dist/contrib/auto-render.min.js"
+    "https://unpkg.com/katex@0.16.22/dist/katex.min.js",
+    "https://unpkg.com/katex@0.16.22/dist/contrib/auto-render.min.js"
 ]
 extra_css = [
-    "https://unpkg.com/katex@0/dist/katex.min.css"
+    "https://unpkg.com/katex@0.16.22/dist/katex.min.css"
 ]
 
 [project.theme]

@@ -118,6 +118,7 @@ def vector_to_params(
 def params_as_dict(params: SoilWaterParams) -> Dict[str, float]:
     return {f.name: getattr(params, f.name) for f in fields(params)}
 
+
 # Fixed, non-calibrated biomass modifiers
 _KC_MIN, _KC_MAX = 0.30, 1.20
 _INTERCEPTION_MAX_MM = 3.0
@@ -173,25 +174,27 @@ def clay_modified_properties(clay_pct: float, params: SoilWaterParams):
     dclay = clay - params.reference_clay_pct
     s = params.clay_sensitivity
 
-    soil_water_capacity = float(np.clip(
-        params.base_soil_water_capacity_mm * (1.0 + s * dclay / 100.0),
-        60.0, 320.0
-    ))
+    soil_water_capacity = float(
+        np.clip(
+            params.base_soil_water_capacity_mm * (1.0 + s * dclay / 100.0), 60.0, 320.0
+        )
+    )
 
-    drainage_coeff = float(np.clip(
-        params.base_drainage_coeff * (1.0 - 0.5 * s * dclay / 100.0),
-        0.015, 0.25
-    ))
+    drainage_coeff = float(
+        np.clip(
+            params.base_drainage_coeff * (1.0 - 0.5 * s * dclay / 100.0), 0.015, 0.25
+        )
+    )
 
-    runoff_fraction_max = float(np.clip(
-        params.base_runoff_fraction_max * (1.0 + 0.5 * s * dclay / 100.0),
-        0.05, 0.90
-    ))
+    runoff_fraction_max = float(
+        np.clip(
+            params.base_runoff_fraction_max * (1.0 + 0.5 * s * dclay / 100.0),
+            0.05,
+            0.90,
+        )
+    )
 
-    stress_exponent = float(np.clip(
-        1.4 * (1.0 + 0.3 * s * dclay / 100.0),
-        1.0, 2.2
-    ))
+    stress_exponent = float(np.clip(1.4 * (1.0 + 0.3 * s * dclay / 100.0), 1.0, 2.2))
 
     return soil_water_capacity, drainage_coeff, runoff_fraction_max, stress_exponent
 
@@ -224,7 +227,9 @@ def simulate_soil_water_balance(
     interception_capacity = biomass_interception_capacity_mm(B, half_sat)
     uptake_factor = biomass_uptake_factor(B, half_sat)
 
-    Smax, drain_coeff, runoff_max, stress_exp = clay_modified_properties(clay_pct, params)
+    Smax, drain_coeff, runoff_max, stress_exp = clay_modified_properties(
+        clay_pct, params
+    )
 
     n = len(df)
     S = np.zeros(n)
@@ -256,7 +261,7 @@ def simulate_soil_water_balance(
             uptake_i = 1.0 + (uptake_factor[i] - 1.0) * _FROZEN_UPTAKE_MULTIPLIER
             drain_i = drain_coeff * _FROZEN_DRAINAGE_MULTIPLIER
         else:
-            runoff_frac = runoff_max * (rel_sat ** params.runoff_exponent)
+            runoff_frac = runoff_max * (rel_sat**params.runoff_exponent)
             runoff[i] = runoff_frac * throughfall_mm[i]
             infiltration = throughfall_mm[i] - runoff[i]
             pet_i = base_pet[i]
@@ -303,5 +308,3 @@ def simulate_soil_water_balance(
         df = df[cols]
 
     return df
-
-

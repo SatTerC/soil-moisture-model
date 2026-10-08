@@ -63,7 +63,8 @@ class SoilWaterOutput:
     throughfall: NDArray[np.float64]
     """Precipitation reaching the soil surface (mm per week)."""
     runoff: NDArray[np.float64]
-    """Throughfall that runs off instead of infiltrating (mm per week)."""
+    """Throughfall that runs off instead of infiltrating, including
+    saturation excess (mm per week)."""
     drainage: NDArray[np.float64]
     """Water draining below the store (mm per week)."""
     water_stress: NDArray[np.float64]
@@ -96,13 +97,15 @@ def simulate(
     Each week $t$, starting from store $S_{t-1}$:
 
     1. Interception $I = \min(P, I_{\max})$, throughfall $P_T = P - I$.
-    2. Runoff $Q = r_{\max} (S_{t-1}/S_{\max})^{\gamma} P_T$, or
-       $(1 - \phi_f) P_T$ if frozen; infiltration $F = P_T - Q$.
-    3. Available water $A = \min(S_{\max}, S_{t-1} + F)$.
-    4. Water stress $w = (A / S_{\max})^{\beta}$.
-    5. Actual evapotranspiration $E_a = \min(w\, E_0 k_c u,\; A)$.
-    6. Drainage $D = d \max(A - E_a - \theta_{fc} S_{\max}, 0)$.
-    7. $S_t = A - E_a - D$.
+    2. Surface runoff $Q_s = r_{\max} (S_{t-1}/S_{\max})^{\gamma} P_T$, or
+       $(1 - \phi_f) P_T$ if frozen.
+    3. Saturation excess $Q_e = \max(S_{t-1} + P_T - Q_s - S_{\max}, 0)$ also
+       runs off: total runoff $Q = Q_s + Q_e$, infiltration $F = P_T - Q$.
+    4. Available water $A = S_{t-1} + F \le S_{\max}$.
+    5. Water stress $w = (A / S_{\max})^{\beta}$.
+    6. Actual evapotranspiration $E_a = \min(w\, E_0 k_c u,\; A)$.
+    7. Drainage $D = d \max(A - E_a - \theta_{fc} S_{\max}, 0)$.
+    8. $S_t = A - E_a - D$.
 
     Parameters
     ----------
@@ -202,7 +205,10 @@ def simulate(
 
     for t in range(n_time):
         thawed_runoff = r_max * (s / s_max) ** params.runoff_exponent * throughfall[t]
-        runoff[t] = np.where(frozen[t], frozen_runoff[t], thawed_runoff)
+        surface_runoff = np.where(frozen[t], frozen_runoff[t], thawed_runoff)
+        # Infiltration that would overfill the store runs off instead.
+        excess = np.maximum(s + throughfall[t] - surface_runoff - s_max, 0.0)
+        runoff[t] = surface_runoff + excess
         available = np.minimum(s_max, s + throughfall[t] - runoff[t])
         stress[t] = np.clip((available / s_max) ** beta, 0.0, 1.0)
         aet[t] = np.minimum(pet[t] * stress[t], available)

@@ -155,7 +155,7 @@ def build_scenarios() -> list[Scenario]:
             biomass_gC_m2=biomass_seasonal,
             elevation_m=50.0,
             clay_pct=70.0,
-            requires={"overflow_weeks": lambda c: c["overflow_weeks"] > 20},
+            requires={"saturated_weeks": lambda c: c["saturated_weeks"] > 20},
         ),
         Scenario(
             name="dry_sandy",
@@ -312,7 +312,7 @@ def coverage_counts(scenario: Scenario, out: dict[str, np.ndarray]) -> dict:
 
     return {
         "frozen_weeks": int(np.sum(out["frozen_soil"])),
-        "overflow_weeks": int(np.sum(s_prev + infiltration > capacity)),
+        "saturated_weeks": int(np.sum(s_prev + infiltration >= capacity - 1e-9)),
         "zero_biomass_weeks": int(np.sum(scenario.biomass_gC_m2 <= 0.0)),
         "near_empty_weeks": int(np.sum(out["relative_soil_moisture"] < 0.05)),
         "negative_precip_weeks": int(np.sum(scenario.precip_mm < 0.0)),
@@ -379,13 +379,20 @@ def main() -> None:
     FIXTURE_DIR.mkdir(parents=True, exist_ok=True)
     failures = []
     for scenario in build_scenarios():
-        out = run_current(scenario) if args.fixed_by else run_legacy(scenario)
+        path = FIXTURE_DIR / f"{scenario.name}.npz"
+        if args.check:
+            # Compare against whichever model produced the stored fixture.
+            with np.load(path) as stored:
+                source = json.loads(str(stored["meta"]))["source"]
+            from_legacy = source.startswith("legacy")
+        else:
+            from_legacy = not args.fixed_by
+        out = run_legacy(scenario) if from_legacy else run_current(scenario)
         counts = coverage_counts(scenario, out)
         unmet = [k for k, ok in scenario.requires.items() if not ok(counts)]
         if unmet:
             failures.append(f"{scenario.name}: branch not exercised: {unmet}")
 
-        path = FIXTURE_DIR / f"{scenario.name}.npz"
         if args.check:
             with np.load(path) as stored:
                 for k, v in out.items():

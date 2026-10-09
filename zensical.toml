@@ -13,6 +13,7 @@ use_directory_urls = false
 nav = [
     { "Home" = "index.md" },
     { "Science" = "science.md" },
+    { "Notation" = "notation.md" },
     { "API Reference" = [
         "API_Reference/model.md",
         "API_Reference/params.md",

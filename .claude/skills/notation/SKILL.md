@@ -18,7 +18,7 @@ description: >-
 
 **Read it before writing maths or naming a mathematical quantity.**
 Do not reconstruct a symbol from FAO-56, from memory, or from surrounding code.
-Surrounding code may predate the agreement; the Migration section lists renames not yet applied.
+Surrounding code may predate the agreement; where the two disagree, the document is right.
 
 Two rules that are easy to get wrong:
 

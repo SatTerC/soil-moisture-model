@@ -1,0 +1,22 @@
+{#- Summary of attributes, independent of the `members` option.
+
+The stock template filters the summary by the rendered members, so
+`members: false` (which the science page uses to show the table without a
+heading per field) empties it. Here only the configured filters apply.
+`summary.attributes` is enabled only on the science page's tables.
+-#}
+
+{% if not obj.docstring.parsed | selectattr("kind.value", "eq", "attributes") | list %}
+  {% with section = obj.attributes
+      |filter_objects(
+        filters=config.filters,
+        members_list=none,
+        inherited_members=config.inherited_members,
+        keep_no_docstrings=config.show_if_no_docstring,
+      )
+      |order_members(config.members_order, none)
+      |as_attributes_section(check_public=true)
+    %}
+    {% if section %}{% include "docstring/attributes.html.jinja" with context %}{% endif %}
+  {% endwith %}
+{% endif %}

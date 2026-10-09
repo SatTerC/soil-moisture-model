@@ -1,0 +1,46 @@
+{% extends "_base/docstring/attributes.html.jinja" %}
+
+{#- Attributes in `spacy` style, with the default value and the whole docstring.
+
+Used for the parameter and constant tables on the science page, which opt in
+with `docstring_section_style: spacy`; the API reference pages keep the `list`
+style. The stock attributes summary keeps only the first line of each field's
+docstring and drops the default, so this reads the full docstring off the
+member and adds a DEFAULT column. Follows the override pattern in satterc's
+`docs_tools/templates`.
+-#}
+
+{% import "language.html.jinja" as lang with context %}
+
+{% block spacy_style scoped %}
+  <table>
+    <thead>
+      <tr>
+        <th><span class="doc-section-title">{{ (section.title or lang.t("ATTRIBUTE")).rstrip(":").upper() }}</span></th>
+        <th><span>{{ lang.t("DESCRIPTION") }}</span></th>
+        <th><span>DEFAULT</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for attribute in section.value %}
+        {% set member = obj.members.get(attribute.name) %}
+        {% set description = member.docstring.value if member and member.docstring else attribute.description %}
+        <tr class="doc-section-item">
+          <td><code>{{ attribute.name }}</code></td>
+          <td>
+            <div class="doc-md-description">
+              {{ description|convert_markdown(heading_level, html_id, autoref_hook=autoref_hook) }}
+            </div>
+          </td>
+          <td>
+            {% if attribute.value is not none %}
+              {% with expression = attribute.value %}
+                <code>{% include "expression.html.jinja" with context %}</code>
+              {% endwith %}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock spacy_style %}

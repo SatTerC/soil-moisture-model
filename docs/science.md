@@ -158,16 +158,35 @@ The nine calibrated parameters are fields of [`SoilWaterParams`](API_Reference/p
 Every other number in the equations above is a field of [`ModelConstants`](API_Reference/params.md#soil_moisture_model.params.ModelConstants), with its default value, so sensitivity studies can vary them without editing the code.
 The initial store $S_0$ is an argument of [`simulate`](API_Reference/model.md#soil_moisture_model.model.simulate) rather than a parameter.
 
-| Symbol | Meaning | Where |
-|---|---|---|
-| $S_{\max,0}$, $d_0$, $r_{\max,0}$ | base capacity, drainage coefficient, max runoff fraction | `SoilWaterParams` |
-| $\gamma$, $\theta_{fc}$ | runoff exponent, field-capacity fraction | `SoilWaterParams` |
-| $C_{\mathrm{ref}}$, $s_C$ | reference clay, clay sensitivity | `SoilWaterParams` |
-| $c_E$, $K_B$ | ET coefficient, biomass half-saturation | `SoilWaterParams` |
-| $k_{c,\min}$, $k_{c,\max}$, $I_{\max}^{\infty}$, $u_{\max}$ | biomass-effect limits | `ModelConstants` |
-| $T_b$, $g_z$, $m_{z,\min}$, $m_{z,\max}$ | base temperature, elevation gradient and bounds | `ModelConstants` |
-| $\beta_0$, $a_d$, $a_r$, $a_\beta$ | base stress exponent, clay response factors | `ModelConstants` |
-| $\phi_f$ and the frozen multipliers | frozen-soil behaviour | `ModelConstants` |
+### Calibrated parameters
+
+::: soil_moisture_model.params.SoilWaterParams
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      show_signature: false
+      show_bases: false
+      show_docstring_description: false
+      show_docstring_raises: false
+      members: false
+      summary:
+        attributes: true
+      docstring_section_style: spacy
+
+### Fixed constants
+
+::: soil_moisture_model.params.ModelConstants
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      show_signature: false
+      show_bases: false
+      show_docstring_description: false
+      show_docstring_raises: false
+      members: false
+      summary:
+        attributes: true
+      docstring_section_style: spacy
 
 ## Limitations
 

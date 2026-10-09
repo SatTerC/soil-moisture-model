@@ -26,4 +26,4 @@ typecheck:
 
 # Build the documentation using Zensical.
 docs: 
-  zensical build
+  zensical build --clean --strict

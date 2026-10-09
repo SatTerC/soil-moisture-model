@@ -19,7 +19,7 @@ DEFAULT_CONSTANTS = ModelConstants()
 def biomass_saturation(
     biomass: ArrayLike, biomass_half_saturation: ArrayLike
 ) -> NDArray:
-    r"""Return the saturating biomass fraction that scales every biomass effect.
+    r"""Return the biomass saturation, which scales every biomass effect.
 
     $$
     f_B = \frac{B}{B + K_B}, \qquad B \leftarrow \max(B, 0)
@@ -31,13 +31,13 @@ def biomass_saturation(
         Plant biomass, $B$ (grams of carbon per square metre). Negative values
         are treated as zero.
     biomass_half_saturation
-        Biomass at which $f_B = 1/2$, $K_B$ (grams of carbon per square metre).
-        Must be positive.
+        Biomass half-saturation, the biomass at which $f_B = 1/2$, $K_B$ (grams
+        of carbon per square metre). Must be positive.
 
     Returns
     -------
     NDArray
-        $f_B \in [0, 1)$ (dimensionless).
+        Biomass saturation, $f_B \in [0, 1)$ (dimensionless).
     """
     b = np.maximum(np.asarray(biomass, dtype=float), 0.0)
     return b / (b + biomass_half_saturation)
@@ -46,23 +46,24 @@ def biomass_saturation(
 def crop_coefficient(
     biomass_saturation: ArrayLike, constants: ModelConstants = DEFAULT_CONSTANTS
 ) -> NDArray:
-    r"""Return the crop coefficient, interpolated linearly in the biomass fraction.
+    r"""Return the crop coefficient, interpolated linearly in the biomass saturation.
 
     $$
-    k_c = k_{c,\min} + (k_{c,\max} - k_{c,\min})\, f_B
+    K_c = K_{c,\min} + (K_{c,\max} - K_{c,\min})\, f_B
     $$
 
     Parameters
     ----------
     biomass_saturation
-        Biomass fraction $f_B$; see `biomass_saturation`.
+        Biomass saturation, $f_B$; see `biomass_saturation`.
     constants
-        Supplies `min_crop_coefficient` and `max_crop_coefficient`.
+        Supplies `min_crop_coefficient`, $K_{c,\min}$, and
+        `max_crop_coefficient`, $K_{c,\max}$.
 
     Returns
     -------
     NDArray
-        $k_c$ (dimensionless).
+        Crop coefficient, $K_c$ (dimensionless).
     """
     lo, hi = constants.min_crop_coefficient, constants.max_crop_coefficient
     return lo + (hi - lo) * np.asarray(biomass_saturation, dtype=float)
@@ -71,23 +72,22 @@ def crop_coefficient(
 def interception_capacity(
     biomass_saturation: ArrayLike, constants: ModelConstants = DEFAULT_CONSTANTS
 ) -> NDArray:
-    r"""Return the weekly canopy interception capacity.
+    r"""Return the weekly interception capacity, $f_B\, I_{\max}$.
 
-    $$
-    I_{\max} = I_{\max}^{\infty}\, f_B
-    $$
+    The interception capacity rises linearly from zero with no biomass to
+    $I_{\max}$ as biomass becomes large. It deliberately has no symbol of its own.
 
     Parameters
     ----------
     biomass_saturation
-        Biomass fraction $f_B$; see `biomass_saturation`.
+        Biomass saturation, $f_B$; see `biomass_saturation`.
     constants
-        Supplies `max_interception_capacity`, $I_{\max}^{\infty}$.
+        Supplies `max_interception_capacity`, $I_{\max}$.
 
     Returns
     -------
     NDArray
-        $I_{\max}$ (mm per week).
+        Interception capacity, $f_B\, I_{\max}$ (mm per week).
     """
     return constants.max_interception_capacity * np.asarray(
         biomass_saturation, dtype=float
@@ -97,7 +97,7 @@ def interception_capacity(
 def uptake_factor(
     biomass_saturation: ArrayLike, constants: ModelConstants = DEFAULT_CONSTANTS
 ) -> NDArray:
-    r"""Return the root-uptake multiplier on potential evapotranspiration.
+    r"""Return the uptake factor, a multiplier on potential evapotranspiration.
 
     $$
     u = 1 + (u_{\max} - 1)\, f_B
@@ -106,14 +106,14 @@ def uptake_factor(
     Parameters
     ----------
     biomass_saturation
-        Biomass fraction $f_B$; see `biomass_saturation`.
+        Biomass saturation, $f_B$; see `biomass_saturation`.
     constants
         Supplies `max_uptake_factor`, $u_{\max}$.
 
     Returns
     -------
     NDArray
-        $u$ (dimensionless).
+        Uptake factor, $u$ (dimensionless).
     """
     return 1.0 + (constants.max_uptake_factor - 1.0) * np.asarray(
         biomass_saturation, float
@@ -135,12 +135,12 @@ def elevation_et_multiplier(
         Site elevation, $z$ (metres).
     constants
         Supplies `elevation_et_gradient`, $g_z$, and
-        `elevation_et_multiplier_bounds`.
+        `elevation_et_multiplier_bounds`, $(m_{z,\min}, m_{z,\max})$.
 
     Returns
     -------
     NDArray
-        $m_z$ (dimensionless).
+        Elevation multiplier, $m_z$ (dimensionless).
     """
     z_km = np.asarray(elevation, dtype=float) / 1000.0
     lo, hi = constants.elevation_et_multiplier_bounds
@@ -156,11 +156,11 @@ def reference_evapotranspiration(
     r"""Return weekly reference evapotranspiration from a degree-day relation.
 
     $$
-    E_0 = c_E \cdot 7 \max(T - T_b, 0) \cdot m_z
+    ET_o = c_{ET} \cdot 7 \max(T - T_b, 0) \cdot m_z
     $$
 
-    This is the evaporative demand before the crop coefficient and uptake
-    factor are applied.
+    This is the evaporative demand before the frozen-week adjustment, the crop
+    coefficient and the uptake factor are applied.
 
     Parameters
     ----------
@@ -169,14 +169,15 @@ def reference_evapotranspiration(
     elevation
         Site elevation (metres); see `elevation_et_multiplier`.
     reference_et_coefficient
-        Evapotranspiration per degree-day, $c_E$ (mm per degC per day).
+        Reference ET coefficient, the reference evapotranspiration per
+        degree-day, $c_{ET}$ (mm per degC per day).
     constants
         Supplies `base_temperature`, $T_b$, and the elevation settings.
 
     Returns
     -------
     NDArray
-        $E_0$ (mm per week).
+        Reference evapotranspiration, $ET_o$ (mm per week).
     """
     temp = np.asarray(temperature, dtype=float)
     coefficient = np.asarray(reference_et_coefficient, dtype=float)
@@ -192,15 +193,16 @@ class SoilProperties:
     """
 
     soil_water_capacity: NDArray[np.float64]
-    """Maximum soil water storage, $S_{\\max}$ (mm)."""
+    r"""Soil water capacity, $S_{\max}$ (mm)."""
     drainage_coefficient: NDArray[np.float64]
-    """Fraction of water above field capacity drained per week, $d$
-    (dimensionless)."""
+    """Drainage coefficient, the fraction of water above field capacity drained
+    per week, $k_d$ (dimensionless)."""
     max_runoff_fraction: NDArray[np.float64]
-    """Fraction of throughfall that runs off a saturated soil, $r_{\\max}$
-    (dimensionless)."""
+    r"""Maximum runoff fraction, the fraction of throughfall that runs off when
+    the store is full, $r_{\max}$ (dimensionless)."""
     stress_exponent: NDArray[np.float64]
-    """Exponent of the water-stress function, $\\beta$ (dimensionless)."""
+    r"""Stress exponent, the exponent of relative soil moisture in the
+    water-stress coefficient, $\beta$ (dimensionless)."""
 
 
 def soil_properties(
@@ -208,22 +210,22 @@ def soil_properties(
     params: SoilWaterParams,
     constants: ModelConstants = DEFAULT_CONSTANTS,
 ) -> SoilProperties:
-    r"""Adjust the base soil properties for clay content.
+    r"""Adjust the nominal soil properties for clay content.
 
     With clay content $C$ clipped to `clay_bounds` and
 
     $$
-    \Delta = s_C \, \frac{C - C_{\mathrm{ref}}}{100},
+    \Delta = \kappa \, \frac{C - C^{\circ}}{100},
     $$
 
     each property is scaled linearly in $\Delta$ and then clipped to its bounds:
 
     $$
     \begin{aligned}
-    S_{\max} &= S_{\max,0}\,(1 + \Delta) \\
-    d        &= d_0\,(1 - a_d \Delta) \\
-    r_{\max} &= r_{\max,0}\,(1 + a_r \Delta) \\
-    \beta    &= \beta_0\,(1 + a_\beta \Delta)
+    S_{\max} &= S_{\max}^{\circ}\,(1 + \Delta) \\
+    k_d      &= k_d^{\circ}\,(1 - a_d \Delta) \\
+    r_{\max} &= r_{\max}^{\circ}\,(1 + a_r \Delta) \\
+    \beta    &= \beta^{\circ}\,(1 + a_\beta \Delta)
     \end{aligned}
     $$
 
@@ -235,16 +237,17 @@ def soil_properties(
     clay
         Soil clay content, $C$ (percent).
     params
-        Supplies the `nominal_*` values, `nominal_clay` ($C_{\mathrm{ref}}$)
-        and `clay_sensitivity` ($s_C$).
+        Supplies the `nominal_*` values $S_{\max}^{\circ}$, $k_d^{\circ}$ and
+        $r_{\max}^{\circ}$, `nominal_clay` ($C^{\circ}$) and `clay_sensitivity`
+        ($\kappa$).
     constants
-        Supplies $\beta_0$, the response factors $a_d, a_r, a_\beta$ and all
+        Supplies $\beta^{\circ}$, the clay response factors $a_d, a_r, a_\beta$ and all
         clip bounds.
 
     Returns
     -------
     SoilProperties
-        The adjusted properties.
+        The clay-adjusted properties.
     """
     c = constants
     clay_clipped = np.clip(np.asarray(clay, dtype=float), *c.clay_bounds)

@@ -3,9 +3,10 @@ r"""Weekly bucket model of soil moisture.
 `simulate` steps a single-layer soil water store forward one week at a time.
 Each week, precipitation is split into canopy interception and throughfall;
 throughfall is split into runoff and infiltration; evapotranspiration is drawn
-from the store, limited by water stress; and water above field capacity drains.
-Frozen weeks (air temperature below `ModelConstants.freezing_temperature`)
-infiltrate less and evaporate, take up and drain more slowly.
+from the store, limited by the water-stress coefficient; and water above field
+capacity drains. Frozen weeks (weekly mean air temperature below
+`ModelConstants.freezing_temperature`) infiltrate less and evaporate, take up and
+drain more slowly.
 
 The drivers are time-leading arrays of shape ``(time, *space)``. Site inputs and
 every field of `SoilWaterParams` broadcast against ``space``, so a whole block
@@ -38,40 +39,43 @@ class SoilWaterOutput:
     """
 
     soil_moisture: NDArray[np.float64]
-    """Soil water store at the end of the week (mm)."""
+    """Soil moisture at the end of the week, $S_t$ (mm)."""
     relative_soil_moisture: NDArray[np.float64]
-    """Soil water store as a fraction of the soil water capacity
-    (dimensionless)."""
+    r"""Relative soil moisture, the soil moisture as a fraction of the soil water
+    capacity, $S_r = S_t / S_{\max}$ (dimensionless)."""
     actual_evapotranspiration: NDArray[np.float64]
-    """Water drawn from the soil by evapotranspiration (mm per week)."""
-    potential_evapotranspiration: NDArray[np.float64]
-    """Evapotranspiration if soil water were not limiting: reference
-    evapotranspiration times crop coefficient times uptake factor (mm per
+    """Water drawn from the store by evapotranspiration, $ET_a$ (mm per
     week)."""
+    potential_evapotranspiration: NDArray[np.float64]
+    r"""Evapotranspiration if soil moisture were not limiting: effective reference
+    evapotranspiration times crop coefficient times effective uptake factor,
+    $ET_p = u^{\mathrm{eff}} K_c\, ET_o^{\mathrm{eff}}$ (mm per week)."""
     reference_evapotranspiration: NDArray[np.float64]
-    """Temperature- and elevation-driven evaporative demand, before the frozen
-    multiplier (mm per week)."""
+    """Temperature- and elevation-driven evaporative demand, before the
+    frozen-week adjustment, $ET_o$ (mm per week)."""
     crop_coefficient: NDArray[np.float64]
-    """Biomass-dependent crop coefficient (dimensionless)."""
+    """Biomass-dependent crop coefficient, $K_c$ (dimensionless)."""
     uptake_factor: NDArray[np.float64]
-    """Biomass-dependent root-uptake multiplier, before the frozen multiplier
+    """Biomass-dependent uptake factor, before the frozen-week adjustment, $u$
     (dimensionless)."""
     interception_capacity: NDArray[np.float64]
-    """Biomass-dependent canopy interception capacity (mm per week)."""
+    r"""Biomass-dependent interception capacity, $f_B\, I_{\max}$ (mm per
+    week)."""
     interception: NDArray[np.float64]
-    """Precipitation intercepted by the canopy and evaporated (mm per week)."""
+    """Precipitation intercepted by the canopy and evaporated, $I$ (mm per
+    week)."""
     throughfall: NDArray[np.float64]
-    """Precipitation reaching the soil surface (mm per week)."""
+    """Precipitation reaching the soil surface, $P_T$ (mm per week)."""
     runoff: NDArray[np.float64]
-    """Throughfall that runs off instead of infiltrating, including
-    saturation excess (mm per week)."""
+    """Throughfall that runs off instead of infiltrating, including saturation
+    excess, $Q = Q_s + Q_e$ (mm per week)."""
     drainage: NDArray[np.float64]
-    """Water draining below the store (mm per week)."""
+    """Water draining below the store, $D$ (mm per week)."""
     water_stress_coefficient: NDArray[np.float64]
-    """Water-stress factor on evapotranspiration, 1 meaning unstressed
+    """Reduction factor on evapotranspiration, 1 meaning unstressed, $K_s$
     (dimensionless)."""
     frozen: NDArray[np.bool_]
-    """Whether the soil was treated as frozen."""
+    r"""Whether the week was frozen, $T < T_{\mathrm{frz}}$."""
     soil: SoilProperties
     """Clay-adjusted soil properties, with shape ``space``."""
 
@@ -96,33 +100,41 @@ def simulate(
 
     Each week $t$, starting from store $S_{t-1}$:
 
-    1. Interception $I = \min(P, I_{\max})$, throughfall $P_T = P - I$.
+    1. Interception $I = \min(P, f_B I_{\max})$, throughfall $P_T = P - I$.
     2. Surface runoff $Q_s = r_{\max} (S_{t-1}/S_{\max})^{\gamma} P_T$, or
-       $(1 - \phi_f) P_T$ if frozen.
+       $(1 - \phi^{\mathrm{frz}}) P_T$ in a frozen week.
     3. Saturation excess $Q_e = \max(S_{t-1} + P_T - Q_s - S_{\max}, 0)$ also
        runs off: total runoff $Q = Q_s + Q_e$, infiltration $F = P_T - Q$.
-    4. Available water $A = S_{t-1} + F \le S_{\max}$.
-    5. Water stress $w = (A / S_{\max})^{\beta}$.
-    6. Actual evapotranspiration $E_a = \min(w\, E_0 k_c u,\; A)$.
-    7. Drainage $D = d \max(A - E_a - \theta_{fc} S_{\max}, 0)$.
-    8. $S_t = A - E_a - D$.
+    4. Store after infiltration $S^{+}_t = S_{t-1} + F \le S_{\max}$.
+    5. Water-stress coefficient $K_s = (S^{+}_t / S_{\max})^{\beta}$.
+    6. Potential evapotranspiration $ET_p = u^{\mathrm{eff}} K_c\, ET_o^{\mathrm{eff}}$.
+    7. Actual evapotranspiration $ET_a = \min(K_s\, ET_p,\; S^{+}_t)$.
+    8. Drainage $D = k_d^{\mathrm{eff}} \max(S^{+}_t - ET_a - S_{fc}, 0)$, with
+       field capacity $S_{fc} = \phi_{fc} S_{\max}$.
+    9. $S_t = S^{+}_t - ET_a - D$.
+
+    In an unfrozen week the effective values equal the plain ones. In a frozen
+    week, $ET_o^{\mathrm{eff}} = m^{\mathrm{frz}}_{ET} ET_o$,
+    $u^{\mathrm{eff}} = 1 + m^{\mathrm{frz}}_{u} (u - 1)$ and
+    $k_d^{\mathrm{eff}} = m^{\mathrm{frz}}_{d} k_d$.
 
     Parameters
     ----------
     temperature
-        Weekly mean air temperature (degC), shape ``(time, *space)``.
+        Weekly mean air temperature, $T$ (degC), shape ``(time, *space)``.
     precipitation
-        Weekly precipitation (mm), shape ``(time, *space)``. Negative values
+        Weekly precipitation, $P$ (mm), shape ``(time, *space)``. Negative values
         are treated as zero.
     biomass
-        Plant biomass (grams of carbon per square metre), shape
+        Plant biomass, $B$ (grams of carbon per square metre), shape
         ``(time, *space)``. Negative values are treated as zero.
     elevation
-        Site elevation (metres), broadcastable to ``space``.
+        Site elevation, $z$ (metres), broadcastable to ``space``.
     clay
-        Soil clay content (percent), broadcastable to ``space``.
+        Soil clay content, $C$ (percent), broadcastable to ``space``.
     initial_soil_moisture
-        Soil water store before the first week (mm), broadcastable to ``space``.
+        Initial soil moisture, before the first week, $S_0$ (mm), broadcastable
+        to ``space``.
         Clipped to the soil water capacity.
     params
         Calibrated parameters. Defaults to `SoilWaterParams()`.

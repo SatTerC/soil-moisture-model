@@ -41,11 +41,12 @@ _PARAM_RANGES: dict[str, tuple[float, float, bool]] = {
 
 @dataclass(frozen=True)
 class SoilWaterParams:
-    """Calibrated parameters of the soil water balance.
+    r"""Calibrated parameters of the soil water balance.
 
     The `nominal_*` parameters are the values for a soil whose clay content equals
-    `nominal_clay`; `soil_properties` adjusts them for the actual clay
-    content, with a strength set by `clay_sensitivity`.
+    the nominal clay content $C^{\circ}$ (`nominal_clay`); `soil_properties`
+    adjusts them for the actual clay content $C$, with a strength set by the clay
+    sensitivity $\kappa$ (`clay_sensitivity`).
 
     Raises
     ------
@@ -54,30 +55,32 @@ class SoilWaterParams:
     """
 
     nominal_soil_water_capacity: FloatOrArray = 160.0
-    """Soil water holding capacity at the reference clay content (mm)."""
+    r"""Soil water capacity at the nominal clay content, $S_{\max}^{\circ}$
+    (mm)."""
     nominal_drainage_coefficient: FloatOrArray = 0.10
-    """Fraction of water above field capacity that drains each week, at the
-    reference clay content (dimensionless)."""
+    r"""Fraction of water above field capacity that drains each week, at the
+    nominal clay content, $k_d^{\circ}$ (dimensionless)."""
     nominal_max_runoff_fraction: FloatOrArray = 0.45
-    """Fraction of throughfall that runs off when the soil is saturated, at the
-    reference clay content (dimensionless)."""
+    r"""Fraction of throughfall that runs off when the store is full, at the
+    nominal clay content, $r_{\max}^{\circ}$ (dimensionless)."""
     runoff_exponent: FloatOrArray = 2.0
-    """Exponent of relative soil moisture in the runoff fraction
+    r"""Exponent of relative soil moisture in the runoff fraction, $\gamma$
     (dimensionless)."""
     field_capacity_fraction: FloatOrArray = 0.70
-    """Field capacity as a fraction of the soil water capacity
+    r"""Field capacity as a fraction of the soil water capacity, $\phi_{fc}$
     (dimensionless)."""
     nominal_clay: FloatOrArray = 25.0
-    """Clay content at which the `nominal_*` parameters apply (percent)."""
+    r"""Clay content at which the `nominal_*` parameters apply, $C^{\circ}$
+    (percent)."""
     clay_sensitivity: FloatOrArray = 0.04
-    """Strength of the clay-content adjustment to the soil properties (per
-    percent clay, scaled by 1/100)."""
+    r"""Strength of the clay-content adjustment to the soil properties, $\kappa$
+    (per percent clay, scaled by 1/100)."""
     reference_et_coefficient: FloatOrArray = 0.55
-    """Reference evapotranspiration per degree-day above the base temperature
-    (mm per degC per day)."""
+    r"""Reference evapotranspiration per degree-day above the base temperature,
+    $c_{ET}$ (mm per degC per day)."""
     biomass_half_saturation: FloatOrArray = 150.0
-    """Plant biomass at which the biomass effects reach half their maximum
-    (grams of carbon per square metre)."""
+    r"""Biomass at which the biomass saturation reaches 1/2, $K_B$ (grams of
+    carbon per square metre)."""
 
     def __post_init__(self) -> None:
         """Validate parameter ranges."""
@@ -99,54 +102,59 @@ class ModelConstants:
 
     # --- Biomass effects ---
     min_crop_coefficient: float = 0.30
-    """Crop coefficient with no biomass (dimensionless)."""
+    r"""Crop coefficient with no biomass, $K_{c,\min}$ (dimensionless)."""
     max_crop_coefficient: float = 1.20
-    """Crop coefficient approached as biomass becomes large (dimensionless)."""
+    r"""Crop coefficient approached as biomass becomes large, $K_{c,\max}$
+    (dimensionless)."""
     max_interception_capacity: float = 3.0
-    """Canopy interception capacity approached as biomass becomes large (mm per
-    week)."""
+    r"""Interception capacity approached as biomass becomes large, $I_{\max}$
+    (mm per week)."""
     max_uptake_factor: float = 1.35
-    """Root-uptake multiplier on potential evapotranspiration, approached as
-    biomass becomes large (dimensionless)."""
+    r"""Uptake factor approached as biomass becomes large, $u_{\max}$
+    (dimensionless)."""
 
-    # --- Freezing ---
+    # --- Frozen weeks ---
     freezing_temperature: float = 0.0
-    """Air temperature below which the soil is treated as frozen (degC)."""
+    r"""Weekly mean air temperature below which a week is frozen,
+    $T_{\mathrm{frz}}$ (degC)."""
     frozen_infiltration_fraction: float = 0.20
-    """Fraction of throughfall that infiltrates frozen soil; the rest runs off
-    (dimensionless)."""
+    r"""Fraction of throughfall that infiltrates in a frozen week, the rest
+    running off, $\phi^{\mathrm{frz}}$ (dimensionless)."""
     frozen_drainage_multiplier: float = 0.25
-    """Multiplier on the drainage coefficient when frozen (dimensionless)."""
+    r"""Multiplier on the drainage coefficient in a frozen week,
+    $m^{\mathrm{frz}}_{d}$ (dimensionless)."""
     frozen_uptake_multiplier: float = 0.30
-    """Multiplier on the biomass-driven part of the uptake factor when frozen
-    (dimensionless)."""
+    r"""Multiplier on the biomass-driven part of the uptake factor, $u - 1$, in a
+    frozen week, $m^{\mathrm{frz}}_{u}$ (dimensionless)."""
     frozen_reference_et_multiplier: float = 0.20
-    """Multiplier on reference evapotranspiration when frozen
-    (dimensionless)."""
+    r"""Multiplier on reference evapotranspiration in a frozen week,
+    $m^{\mathrm{frz}}_{ET}$ (dimensionless)."""
 
     # --- Evapotranspiration ---
     base_temperature: float = 0.0
-    """Temperature above which degree-days accumulate (degC)."""
+    r"""Temperature above which degree-days accumulate, $T_b$ (degC)."""
     elevation_et_gradient: float = 0.08
-    """Fractional increase in reference evapotranspiration per kilometre of
-    elevation (per km)."""
+    r"""Fractional increase in reference evapotranspiration per kilometre of
+    elevation, $g_z$ (per km)."""
     elevation_et_multiplier_bounds: tuple[float, float] = (0.75, 1.35)
-    """Clip bounds of the elevation multiplier (dimensionless)."""
+    r"""Clip bounds of the elevation multiplier, $(m_{z,\min}, m_{z,\max})$
+    (dimensionless)."""
 
     # --- Clay effects ---
     clay_bounds: tuple[float, float] = (0.0, 80.0)
     """Clip bounds applied to the input clay content (percent)."""
     drainage_clay_response: float = 0.5
-    """Relative strength of the clay effect on drainage, which it reduces
-    (dimensionless)."""
+    r"""Relative strength of the clay effect on the drainage coefficient, which
+    it reduces, $a_d$ (dimensionless)."""
     runoff_clay_response: float = 0.5
-    """Relative strength of the clay effect on runoff, which it increases
-    (dimensionless)."""
+    r"""Relative strength of the clay effect on the maximum runoff fraction,
+    which it increases, $a_r$ (dimensionless)."""
     stress_clay_response: float = 0.3
-    """Relative strength of the clay effect on the stress exponent, which it
-    increases (dimensionless)."""
+    r"""Relative strength of the clay effect on the stress exponent, which it
+    increases, $a_\beta$ (dimensionless)."""
     nominal_stress_exponent: float = 1.4
-    """Water-stress exponent at the reference clay content (dimensionless)."""
+    r"""Stress exponent at the nominal clay content, $\beta^{\circ}$
+    (dimensionless)."""
     soil_water_capacity_bounds: tuple[float, float] = (60.0, 320.0)
     """Clip bounds of the clay-adjusted soil water capacity (mm)."""
     drainage_coefficient_bounds: tuple[float, float] = (0.015, 0.25)

@@ -58,14 +58,14 @@ SITE_TYPES = (
 # store; the rest are SoilWaterParams fields.
 PARAM_BOUNDS: dict[str, tuple[float, float]] = {
     "initial_soil_moisture": (5.0, 250.0),
-    "base_soil_water_capacity": (60.0, 400.0),
-    "base_drainage_coefficient": (0.01, 0.30),
-    "base_max_runoff_fraction": (0.02, 0.95),
+    "nominal_soil_water_capacity": (60.0, 400.0),
+    "nominal_drainage_coefficient": (0.01, 0.30),
+    "nominal_max_runoff_fraction": (0.02, 0.95),
     "runoff_exponent": (0.5, 4.0),
     "field_capacity_fraction": (0.40, 0.95),
-    "reference_clay": (5.0, 60.0),
+    "nominal_clay": (5.0, 60.0),
     "clay_sensitivity": (0.0, 0.10),
-    "pet_coefficient": (0.1, 1.5),
+    "reference_et_coefficient": (0.1, 1.5),
     "biomass_half_saturation": (20.0, 800.0),
 }
 

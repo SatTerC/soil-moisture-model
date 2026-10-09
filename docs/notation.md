@@ -133,7 +133,7 @@ Dimensionless and shape `(time, *space)`, except where noted.
 | biomass saturation | $f_B = B / (B + K_B)$ | `biomass_saturation` | $0 \le f_B < 1$ |
 | crop coefficient limits | $K_{c,\min}$, $K_{c,\max}$ | `min_crop_coefficient`, `max_crop_coefficient` | |
 | uptake factor | $u = 1 + (u_{\max} - 1) f_B$ | `uptake_factor` | |
-| interception capacity | $f_B\,I_{\max}$ | `interception_capacity` | mm wk⁻¹; deliberately no symbol of its own |
+| interception capacity | $f_B\,I_{\max}$ | `interception_capacity`, local `interception_cap` | mm wk⁻¹; deliberately no symbol of its own |
 | interception capacity limit | $I_{\max}$ | `max_interception_capacity` | mm wk⁻¹ |
 
 ## Temperature, elevation and frozen weeks
@@ -227,3 +227,7 @@ Renames agreed in this document but not yet applied to the code.
 | local `stress` in `simulate` | `k_s` | `model.py` |
 | symbols in `docs/science.md` and in docstrings ($E_0$, $k_c$, $\theta_{fc}$, $s_C$, $d$, $A$, $\phi_f$, $I_{\max}^{\infty}$, subscript-0 nominal values, ...) | the symbols in this document | `docs/science.md`, `model.py`, `processes.py`, `params.py` |
 | argument `pet_coefficient` of `processes.reference_evapotranspiration` | `reference_et_coefficient` | `processes.py`, `model.py`, `tests/test_processes.py` |
+| argument `fraction` of `crop_coefficient`, `interception_capacity`, `uptake_factor` | `biomass_saturation` | `processes.py` |
+| argument `half_saturation` of `processes.biomass_fraction` | `biomass_half_saturation` | `processes.py` |
+| local `t` (temperature) in `processes.reference_evapotranspiration` | `temp` | `processes.py` |
+| local `i_max` (interception capacity) in `simulate` | `interception_cap` | `model.py` |

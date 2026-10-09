@@ -24,7 +24,7 @@ def block():
     clay = rng.uniform(0.0, 90.0, N_PIXEL)
     initial = rng.uniform(0.0, 200.0, N_PIXEL)
     params = SoilWaterParams(
-        base_soil_water_capacity=rng.uniform(60.0, 400.0, N_PIXEL),
+        nominal_soil_water_capacity=rng.uniform(60.0, 400.0, N_PIXEL),
         runoff_exponent=rng.uniform(0.5, 4.0, N_PIXEL),
         clay_sensitivity=rng.uniform(0.0, 0.1, N_PIXEL),
         biomass_half_saturation=rng.uniform(20.0, 800.0, N_PIXEL),

@@ -73,7 +73,7 @@ block = simulate(
     np.repeat(biomass[:, None], n_pixel, axis=1),
     elevation=150.0,
     clay=np.array([10.0, 25.0, 50.0]),
-    params=SoilWaterParams(base_soil_water_capacity=np.array([120.0, 160.0, 200.0])),
+    params=SoilWaterParams(nominal_soil_water_capacity=np.array([120.0, 160.0, 200.0])),
 )
 
 print(block.soil_moisture.shape)  # (156, 3)

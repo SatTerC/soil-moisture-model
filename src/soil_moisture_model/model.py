@@ -21,7 +21,7 @@ from numpy.typing import ArrayLike, NDArray
 from .params import ModelConstants, SoilWaterParams
 from .processes import (
     SoilProperties,
-    biomass_fraction,
+    biomass_saturation,
     crop_coefficient,
     interception_capacity,
     reference_evapotranspiration,
@@ -67,7 +67,7 @@ class SoilWaterOutput:
     saturation excess (mm per week)."""
     drainage: NDArray[np.float64]
     """Water draining below the store (mm per week)."""
-    water_stress: NDArray[np.float64]
+    water_stress_coefficient: NDArray[np.float64]
     """Water-stress factor on evapotranspiration, 1 meaning unstressed
     (dimensionless)."""
     frozen: NDArray[np.bool_]
@@ -176,19 +176,23 @@ def simulate(
     # Everything that does not depend on the soil water store is precomputed for
     # the whole series; only the store itself is stepped through time.
     frozen = temp < c.freezing_temperature
-    f_b = biomass_fraction(bio, params.biomass_half_saturation)
-    kc = crop_coefficient(f_b, c)
+    f_b = biomass_saturation(bio, params.biomass_half_saturation)
+    k_c = crop_coefficient(f_b, c)
     u = uptake_factor(f_b, c)
-    i_max = interception_capacity(f_b, c)
-    interception = np.minimum(precip, i_max)
+    interception_cap = interception_capacity(f_b, c)
+    interception = np.minimum(precip, interception_cap)
     throughfall = precip - interception
 
-    e0 = reference_evapotranspiration(temp, elevation, params.pet_coefficient, c)
-    e0_eff = np.where(frozen, e0 * c.frozen_pet_multiplier, e0)
+    reference_et = reference_evapotranspiration(
+        temp, elevation, params.reference_et_coefficient, c
+    )
+    reference_et_eff = np.where(
+        frozen, reference_et * c.frozen_reference_et_multiplier, reference_et
+    )
     u_eff = np.where(frozen, 1.0 + (u - 1.0) * c.frozen_uptake_multiplier, u)
-    pet = e0_eff * kc * u_eff
-    d = soil.drainage_coefficient
-    d_eff = np.where(frozen, d * c.frozen_drainage_multiplier, d)
+    potential_et = reference_et_eff * k_c * u_eff
+    k_d = soil.drainage_coefficient
+    k_d_eff = np.where(frozen, k_d * c.frozen_drainage_multiplier, k_d)
 
     s_max = np.broadcast_to(soil.soil_water_capacity, space)
     r_max = soil.max_runoff_fraction
@@ -201,7 +205,7 @@ def simulate(
     runoff = np.empty(shape)
     drainage = np.empty(shape)
     aet = np.empty(shape)
-    stress = np.empty(shape)
+    k_s = np.empty(shape)
 
     for t in range(n_time):
         thawed_runoff = r_max * (s / s_max) ** params.runoff_exponent * throughfall[t]
@@ -209,11 +213,13 @@ def simulate(
         # Infiltration that would overfill the store runs off instead.
         excess = np.maximum(s + throughfall[t] - surface_runoff - s_max, 0.0)
         runoff[t] = surface_runoff + excess
-        available = np.minimum(s_max, s + throughfall[t] - runoff[t])
-        stress[t] = np.clip((available / s_max) ** beta, 0.0, 1.0)
-        aet[t] = np.minimum(pet[t] * stress[t], available)
-        after_et = available - aet[t]
-        drainage[t] = d_eff[t] * np.maximum(after_et - s_fc, 0.0)
+        soil_moisture_after_infiltration = np.minimum(
+            s_max, s + throughfall[t] - runoff[t]
+        )
+        k_s[t] = np.clip((soil_moisture_after_infiltration / s_max) ** beta, 0.0, 1.0)
+        aet[t] = np.minimum(potential_et[t] * k_s[t], soil_moisture_after_infiltration)
+        after_et = soil_moisture_after_infiltration - aet[t]
+        drainage[t] = k_d_eff[t] * np.maximum(after_et - s_fc, 0.0)
         s = np.clip(after_et - drainage[t], 0.0, s_max)
         soil_moisture[t] = s
 
@@ -221,16 +227,16 @@ def simulate(
         soil_moisture=soil_moisture,
         relative_soil_moisture=soil_moisture / s_max,
         actual_evapotranspiration=aet,
-        potential_evapotranspiration=pet,
-        reference_evapotranspiration=e0,
-        crop_coefficient=kc,
+        potential_evapotranspiration=potential_et,
+        reference_evapotranspiration=reference_et,
+        crop_coefficient=k_c,
         uptake_factor=u,
-        interception_capacity=i_max,
+        interception_capacity=interception_cap,
         interception=interception,
         throughfall=throughfall,
         runoff=runoff,
         drainage=drainage,
-        water_stress=stress,
+        water_stress_coefficient=k_s,
         frozen=frozen,
         soil=soil,
     )

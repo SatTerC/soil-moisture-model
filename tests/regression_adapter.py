@@ -10,14 +10,14 @@ from soil_moisture_model import SoilWaterParams, simulate
 
 # legacy SoilWaterParams field -> current SoilWaterParams field
 PARAM_NAMES = {
-    "base_soil_water_capacity_mm": "base_soil_water_capacity",
-    "base_drainage_coeff": "base_drainage_coefficient",
-    "base_runoff_fraction_max": "base_max_runoff_fraction",
+    "base_soil_water_capacity_mm": "nominal_soil_water_capacity",
+    "base_drainage_coeff": "nominal_drainage_coefficient",
+    "base_runoff_fraction_max": "nominal_max_runoff_fraction",
     "runoff_exponent": "runoff_exponent",
     "field_capacity_fraction": "field_capacity_fraction",
-    "reference_clay_pct": "reference_clay",
+    "reference_clay_pct": "nominal_clay",
     "clay_sensitivity": "clay_sensitivity",
-    "pet_coeff_mm_per_degday": "pet_coefficient",
+    "pet_coeff_mm_per_degday": "reference_et_coefficient",
     "biomass_half_sat_gC_m2": "biomass_half_saturation",
 }
 
@@ -44,7 +44,7 @@ def run_scenario(inputs: dict) -> dict[str, np.ndarray]:
         "throughfall_mm": out.throughfall,
         "frozen_soil": out.frozen,
         "et_potential_mm": out.potential_evapotranspiration,
-        "water_stress": out.water_stress,
+        "water_stress": out.water_stress_coefficient,
         "et_actual_mm": out.actual_evapotranspiration,
         "total_evaporative_loss_mm": out.total_evaporative_loss,
         "runoff_mm": out.runoff,

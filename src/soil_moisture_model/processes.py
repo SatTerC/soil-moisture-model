@@ -16,7 +16,9 @@ from .params import ModelConstants, SoilWaterParams
 DEFAULT_CONSTANTS = ModelConstants()
 
 
-def biomass_fraction(biomass: ArrayLike, half_saturation: ArrayLike) -> NDArray:
+def biomass_saturation(
+    biomass: ArrayLike, biomass_half_saturation: ArrayLike
+) -> NDArray:
     r"""Return the saturating biomass fraction that scales every biomass effect.
 
     $$
@@ -28,7 +30,7 @@ def biomass_fraction(biomass: ArrayLike, half_saturation: ArrayLike) -> NDArray:
     biomass
         Plant biomass, $B$ (grams of carbon per square metre). Negative values
         are treated as zero.
-    half_saturation
+    biomass_half_saturation
         Biomass at which $f_B = 1/2$, $K_B$ (grams of carbon per square metre).
         Must be positive.
 
@@ -38,11 +40,11 @@ def biomass_fraction(biomass: ArrayLike, half_saturation: ArrayLike) -> NDArray:
         $f_B \in [0, 1)$ (dimensionless).
     """
     b = np.maximum(np.asarray(biomass, dtype=float), 0.0)
-    return b / (b + half_saturation)
+    return b / (b + biomass_half_saturation)
 
 
 def crop_coefficient(
-    fraction: ArrayLike, constants: ModelConstants = DEFAULT_CONSTANTS
+    biomass_saturation: ArrayLike, constants: ModelConstants = DEFAULT_CONSTANTS
 ) -> NDArray:
     r"""Return the crop coefficient, interpolated linearly in the biomass fraction.
 
@@ -52,8 +54,8 @@ def crop_coefficient(
 
     Parameters
     ----------
-    fraction
-        Biomass fraction $f_B$; see `biomass_fraction`.
+    biomass_saturation
+        Biomass fraction $f_B$; see `biomass_saturation`.
     constants
         Supplies `min_crop_coefficient` and `max_crop_coefficient`.
 
@@ -63,11 +65,11 @@ def crop_coefficient(
         $k_c$ (dimensionless).
     """
     lo, hi = constants.min_crop_coefficient, constants.max_crop_coefficient
-    return lo + (hi - lo) * np.asarray(fraction, dtype=float)
+    return lo + (hi - lo) * np.asarray(biomass_saturation, dtype=float)
 
 
 def interception_capacity(
-    fraction: ArrayLike, constants: ModelConstants = DEFAULT_CONSTANTS
+    biomass_saturation: ArrayLike, constants: ModelConstants = DEFAULT_CONSTANTS
 ) -> NDArray:
     r"""Return the weekly canopy interception capacity.
 
@@ -77,8 +79,8 @@ def interception_capacity(
 
     Parameters
     ----------
-    fraction
-        Biomass fraction $f_B$; see `biomass_fraction`.
+    biomass_saturation
+        Biomass fraction $f_B$; see `biomass_saturation`.
     constants
         Supplies `max_interception_capacity`, $I_{\max}^{\infty}$.
 
@@ -87,11 +89,13 @@ def interception_capacity(
     NDArray
         $I_{\max}$ (mm per week).
     """
-    return constants.max_interception_capacity * np.asarray(fraction, dtype=float)
+    return constants.max_interception_capacity * np.asarray(
+        biomass_saturation, dtype=float
+    )
 
 
 def uptake_factor(
-    fraction: ArrayLike, constants: ModelConstants = DEFAULT_CONSTANTS
+    biomass_saturation: ArrayLike, constants: ModelConstants = DEFAULT_CONSTANTS
 ) -> NDArray:
     r"""Return the root-uptake multiplier on potential evapotranspiration.
 
@@ -101,8 +105,8 @@ def uptake_factor(
 
     Parameters
     ----------
-    fraction
-        Biomass fraction $f_B$; see `biomass_fraction`.
+    biomass_saturation
+        Biomass fraction $f_B$; see `biomass_saturation`.
     constants
         Supplies `max_uptake_factor`, $u_{\max}$.
 
@@ -111,10 +115,12 @@ def uptake_factor(
     NDArray
         $u$ (dimensionless).
     """
-    return 1.0 + (constants.max_uptake_factor - 1.0) * np.asarray(fraction, float)
+    return 1.0 + (constants.max_uptake_factor - 1.0) * np.asarray(
+        biomass_saturation, float
+    )
 
 
-def elevation_pet_multiplier(
+def elevation_et_multiplier(
     elevation: ArrayLike, constants: ModelConstants = DEFAULT_CONSTANTS
 ) -> NDArray:
     r"""Return the multiplier on reference evapotranspiration due to elevation.
@@ -128,8 +134,8 @@ def elevation_pet_multiplier(
     elevation
         Site elevation, $z$ (metres).
     constants
-        Supplies `elevation_pet_gradient`, $g_z$, and
-        `elevation_pet_multiplier_bounds`.
+        Supplies `elevation_et_gradient`, $g_z$, and
+        `elevation_et_multiplier_bounds`.
 
     Returns
     -------
@@ -137,14 +143,14 @@ def elevation_pet_multiplier(
         $m_z$ (dimensionless).
     """
     z_km = np.asarray(elevation, dtype=float) / 1000.0
-    lo, hi = constants.elevation_pet_multiplier_bounds
-    return np.clip(1.0 + constants.elevation_pet_gradient * z_km, lo, hi)
+    lo, hi = constants.elevation_et_multiplier_bounds
+    return np.clip(1.0 + constants.elevation_et_gradient * z_km, lo, hi)
 
 
 def reference_evapotranspiration(
     temperature: ArrayLike,
     elevation: ArrayLike,
-    pet_coefficient: ArrayLike,
+    reference_et_coefficient: ArrayLike,
     constants: ModelConstants = DEFAULT_CONSTANTS,
 ) -> NDArray:
     r"""Return weekly reference evapotranspiration from a degree-day relation.
@@ -161,21 +167,21 @@ def reference_evapotranspiration(
     temperature
         Weekly mean air temperature, $T$ (degC).
     elevation
-        Site elevation (metres); see `elevation_pet_multiplier`.
-    pet_coefficient
+        Site elevation (metres); see `elevation_et_multiplier`.
+    reference_et_coefficient
         Evapotranspiration per degree-day, $c_E$ (mm per degC per day).
     constants
-        Supplies `pet_base_temperature`, $T_b$, and the elevation settings.
+        Supplies `base_temperature`, $T_b$, and the elevation settings.
 
     Returns
     -------
     NDArray
         $E_0$ (mm per week).
     """
-    t = np.asarray(temperature, dtype=float)
-    coefficient = np.asarray(pet_coefficient, dtype=float)
-    degree_days = np.maximum(t - constants.pet_base_temperature, 0.0) * DAYS_PER_WEEK
-    return coefficient * degree_days * elevation_pet_multiplier(elevation, constants)
+    temp = np.asarray(temperature, dtype=float)
+    coefficient = np.asarray(reference_et_coefficient, dtype=float)
+    degree_days = np.maximum(temp - constants.base_temperature, 0.0) * DAYS_PER_WEEK
+    return coefficient * degree_days * elevation_et_multiplier(elevation, constants)
 
 
 @dataclass(frozen=True)
@@ -229,7 +235,7 @@ def soil_properties(
     clay
         Soil clay content, $C$ (percent).
     params
-        Supplies the `base_*` values, `reference_clay` ($C_{\mathrm{ref}}$)
+        Supplies the `nominal_*` values, `nominal_clay` ($C_{\mathrm{ref}}$)
         and `clay_sensitivity` ($s_C$).
     constants
         Supplies $\beta_0$, the response factors $a_d, a_r, a_\beta$ and all
@@ -242,23 +248,24 @@ def soil_properties(
     """
     c = constants
     clay_clipped = np.clip(np.asarray(clay, dtype=float), *c.clay_bounds)
-    delta = params.clay_sensitivity * (clay_clipped - params.reference_clay) / 100.0
+    delta = params.clay_sensitivity * (clay_clipped - params.nominal_clay) / 100.0
 
     return SoilProperties(
         soil_water_capacity=np.clip(
-            params.base_soil_water_capacity * (1.0 + delta),
+            params.nominal_soil_water_capacity * (1.0 + delta),
             *c.soil_water_capacity_bounds,
         ),
         drainage_coefficient=np.clip(
-            params.base_drainage_coefficient * (1.0 - c.drainage_clay_response * delta),
+            params.nominal_drainage_coefficient
+            * (1.0 - c.drainage_clay_response * delta),
             *c.drainage_coefficient_bounds,
         ),
         max_runoff_fraction=np.clip(
-            params.base_max_runoff_fraction * (1.0 + c.runoff_clay_response * delta),
+            params.nominal_max_runoff_fraction * (1.0 + c.runoff_clay_response * delta),
             *c.max_runoff_fraction_bounds,
         ),
         stress_exponent=np.clip(
-            c.base_stress_exponent * (1.0 + c.stress_clay_response * delta),
+            c.nominal_stress_exponent * (1.0 + c.stress_clay_response * delta),
             *c.stress_exponent_bounds,
         ),
     )

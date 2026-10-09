@@ -22,7 +22,9 @@ def test_store_within_capacity(inputs):
 @given(inputs=model_inputs())
 def test_stress_in_unit_interval(inputs):
     out = simulate(**inputs)
-    assert np.all((out.water_stress >= 0.0) & (out.water_stress <= 1.0))
+    assert np.all(
+        (out.water_stress_coefficient >= 0.0) & (out.water_stress_coefficient <= 1.0)
+    )
 
 
 @SETTINGS

@@ -5,9 +5,9 @@ import pytest
 
 from soil_moisture_model import ModelConstants, SoilWaterParams, simulate
 from soil_moisture_model.processes import (
-    biomass_fraction,
+    biomass_saturation,
     crop_coefficient,
-    elevation_pet_multiplier,
+    elevation_et_multiplier,
     interception_capacity,
     reference_evapotranspiration,
     soil_properties,
@@ -19,14 +19,14 @@ C = ModelConstants()
 
 class TestBiomassFraction:
     def test_zero_and_half_saturation(self):
-        assert biomass_fraction(0.0, 150.0) == 0.0
-        assert biomass_fraction(150.0, 150.0) == pytest.approx(0.5)
+        assert biomass_saturation(0.0, 150.0) == 0.0
+        assert biomass_saturation(150.0, 150.0) == pytest.approx(0.5)
 
     def test_negative_biomass_treated_as_zero(self):
-        assert biomass_fraction(-10.0, 150.0) == 0.0
+        assert biomass_saturation(-10.0, 150.0) == 0.0
 
     def test_monotone_and_below_one(self):
-        f = biomass_fraction(np.linspace(0, 1e5, 1000), 150.0)
+        f = biomass_saturation(np.linspace(0, 1e5, 1000), 150.0)
         assert np.all(np.diff(f) > 0)
         assert np.all(f < 1)
 
@@ -44,11 +44,11 @@ def test_biomass_effects_span_their_ranges():
 
 class TestElevation:
     def test_sea_level_is_neutral(self):
-        assert elevation_pet_multiplier(0.0) == 1.0
+        assert elevation_et_multiplier(0.0) == 1.0
 
     @pytest.mark.parametrize(("z", "bound"), [(10_000.0, 1), (-10_000.0, 0)])
     def test_clipped(self, z, bound):
-        assert elevation_pet_multiplier(z) == C.elevation_pet_multiplier_bounds[bound]
+        assert elevation_et_multiplier(z) == C.elevation_et_multiplier_bounds[bound]
 
 
 def test_reference_evapotranspiration_degree_days():
@@ -58,13 +58,13 @@ def test_reference_evapotranspiration_degree_days():
 
 
 class TestSoilProperties:
-    def test_reference_clay_gives_base_values(self):
+    def test_nominal_clay_gives_nominal_values(self):
         p = SoilWaterParams()
-        s = soil_properties(p.reference_clay, p)
-        assert s.soil_water_capacity == p.base_soil_water_capacity
-        assert s.drainage_coefficient == p.base_drainage_coefficient
-        assert s.max_runoff_fraction == p.base_max_runoff_fraction
-        assert s.stress_exponent == C.base_stress_exponent
+        s = soil_properties(p.nominal_clay, p)
+        assert s.soil_water_capacity == p.nominal_soil_water_capacity
+        assert s.drainage_coefficient == p.nominal_drainage_coefficient
+        assert s.max_runoff_fraction == p.nominal_max_runoff_fraction
+        assert s.stress_exponent == C.nominal_stress_exponent
 
     def test_more_clay_means_more_storage_and_runoff_less_drainage(self):
         p = SoilWaterParams()
@@ -81,12 +81,12 @@ class TestSoilProperties:
     @pytest.mark.parametrize(
         ("params", "attr", "bound"),
         [
-            ({"base_soil_water_capacity": 1000.0}, "soil_water_capacity", 1),
-            ({"base_soil_water_capacity": 10.0}, "soil_water_capacity", 0),
-            ({"base_drainage_coefficient": 1.0}, "drainage_coefficient", 1),
-            ({"base_drainage_coefficient": 0.0}, "drainage_coefficient", 0),
-            ({"base_max_runoff_fraction": 1.0}, "max_runoff_fraction", 1),
-            ({"base_max_runoff_fraction": 0.0}, "max_runoff_fraction", 0),
+            ({"nominal_soil_water_capacity": 1000.0}, "soil_water_capacity", 1),
+            ({"nominal_soil_water_capacity": 10.0}, "soil_water_capacity", 0),
+            ({"nominal_drainage_coefficient": 1.0}, "drainage_coefficient", 1),
+            ({"nominal_drainage_coefficient": 0.0}, "drainage_coefficient", 0),
+            ({"nominal_max_runoff_fraction": 1.0}, "max_runoff_fraction", 1),
+            ({"nominal_max_runoff_fraction": 0.0}, "max_runoff_fraction", 0),
         ],
     )
     def test_property_clipped(self, params, attr, bound):

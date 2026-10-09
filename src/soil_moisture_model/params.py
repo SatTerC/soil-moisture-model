@@ -27,14 +27,14 @@ def _check(name: str, value: ArrayLike, lo: float, hi: float, *, open_lo: bool) 
 
 # name -> (lower bound, upper bound, lower bound excluded?)
 _PARAM_RANGES: dict[str, tuple[float, float, bool]] = {
-    "base_soil_water_capacity": (0.0, np.inf, True),
-    "base_drainage_coefficient": (0.0, 1.0, False),
-    "base_max_runoff_fraction": (0.0, 1.0, False),
+    "nominal_soil_water_capacity": (0.0, np.inf, True),
+    "nominal_drainage_coefficient": (0.0, 1.0, False),
+    "nominal_max_runoff_fraction": (0.0, 1.0, False),
     "runoff_exponent": (0.0, np.inf, True),
     "field_capacity_fraction": (0.0, 1.0, False),
-    "reference_clay": (0.0, 100.0, False),
+    "nominal_clay": (0.0, 100.0, False),
     "clay_sensitivity": (0.0, np.inf, False),
-    "pet_coefficient": (0.0, np.inf, False),
+    "reference_et_coefficient": (0.0, np.inf, False),
     "biomass_half_saturation": (0.0, np.inf, True),
 }
 
@@ -43,8 +43,8 @@ _PARAM_RANGES: dict[str, tuple[float, float, bool]] = {
 class SoilWaterParams:
     """Calibrated parameters of the soil water balance.
 
-    The `base_*` parameters are the values for a soil whose clay content equals
-    `reference_clay`; `soil_properties` adjusts them for the actual clay
+    The `nominal_*` parameters are the values for a soil whose clay content equals
+    `nominal_clay`; `soil_properties` adjusts them for the actual clay
     content, with a strength set by `clay_sensitivity`.
 
     Raises
@@ -53,12 +53,12 @@ class SoilWaterParams:
         If any parameter lies outside its physically meaningful range.
     """
 
-    base_soil_water_capacity: FloatOrArray = 160.0
+    nominal_soil_water_capacity: FloatOrArray = 160.0
     """Soil water holding capacity at the reference clay content (mm)."""
-    base_drainage_coefficient: FloatOrArray = 0.10
+    nominal_drainage_coefficient: FloatOrArray = 0.10
     """Fraction of water above field capacity that drains each week, at the
     reference clay content (dimensionless)."""
-    base_max_runoff_fraction: FloatOrArray = 0.45
+    nominal_max_runoff_fraction: FloatOrArray = 0.45
     """Fraction of throughfall that runs off when the soil is saturated, at the
     reference clay content (dimensionless)."""
     runoff_exponent: FloatOrArray = 2.0
@@ -67,12 +67,12 @@ class SoilWaterParams:
     field_capacity_fraction: FloatOrArray = 0.70
     """Field capacity as a fraction of the soil water capacity
     (dimensionless)."""
-    reference_clay: FloatOrArray = 25.0
-    """Clay content at which the `base_*` parameters apply (percent)."""
+    nominal_clay: FloatOrArray = 25.0
+    """Clay content at which the `nominal_*` parameters apply (percent)."""
     clay_sensitivity: FloatOrArray = 0.04
     """Strength of the clay-content adjustment to the soil properties (per
     percent clay, scaled by 1/100)."""
-    pet_coefficient: FloatOrArray = 0.55
+    reference_et_coefficient: FloatOrArray = 0.55
     """Reference evapotranspiration per degree-day above the base temperature
     (mm per degC per day)."""
     biomass_half_saturation: FloatOrArray = 150.0
@@ -120,17 +120,17 @@ class ModelConstants:
     frozen_uptake_multiplier: float = 0.30
     """Multiplier on the biomass-driven part of the uptake factor when frozen
     (dimensionless)."""
-    frozen_pet_multiplier: float = 0.20
+    frozen_reference_et_multiplier: float = 0.20
     """Multiplier on reference evapotranspiration when frozen
     (dimensionless)."""
 
     # --- Evapotranspiration ---
-    pet_base_temperature: float = 0.0
+    base_temperature: float = 0.0
     """Temperature above which degree-days accumulate (degC)."""
-    elevation_pet_gradient: float = 0.08
+    elevation_et_gradient: float = 0.08
     """Fractional increase in reference evapotranspiration per kilometre of
     elevation (per km)."""
-    elevation_pet_multiplier_bounds: tuple[float, float] = (0.75, 1.35)
+    elevation_et_multiplier_bounds: tuple[float, float] = (0.75, 1.35)
     """Clip bounds of the elevation multiplier (dimensionless)."""
 
     # --- Clay effects ---
@@ -145,7 +145,7 @@ class ModelConstants:
     stress_clay_response: float = 0.3
     """Relative strength of the clay effect on the stress exponent, which it
     increases (dimensionless)."""
-    base_stress_exponent: float = 1.4
+    nominal_stress_exponent: float = 1.4
     """Water-stress exponent at the reference clay content (dimensionless)."""
     soil_water_capacity_bounds: tuple[float, float] = (60.0, 320.0)
     """Clip bounds of the clay-adjusted soil water capacity (mm)."""

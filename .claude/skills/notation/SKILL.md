@@ -2,7 +2,8 @@
 name: notation
 description: >-
   This project's terminology, mathematical notation, and the code identifiers that
-  represent it, recorded in docs/notation.md. Read that file before writing or editing
+  represent it, recorded in docs/notation.md (public glossary) and CONTRIBUTING.md
+  (code-name rules). Read both before writing or editing
   any equation, docstring containing maths, or numerical code, and before naming any
   variable that stands for a mathematical quantity. Triggers include "soil moisture",
   "evapotranspiration", "reference ET", "crop coefficient", "water-stress
@@ -14,16 +15,17 @@ description: >-
 
 # Notation
 
-`docs/notation.md` is authoritative for terminology, symbols, and code names in this project.
+`docs/notation.md` is authoritative for terminology, symbols and public code names in this project.
+The Notation section of `CONTRIBUTING.md` has the rest: how symbols become local names, reserved names, and the editing rules.
 
-**Read it before writing maths or naming a mathematical quantity.**
+**Read both before writing maths or naming a mathematical quantity.**
 Do not reconstruct a symbol from FAO-56, from memory, or from surrounding code.
 Surrounding code may predate the agreement; where the two disagree, the document is right.
 
 Two rules that are easy to get wrong:
 
-- The **Deviations** section lists deliberate departures from FAO-56.
+- The **Deviations** section of `docs/notation.md` lists deliberate departures from FAO-56.
   Code matching those entries is correct.
   Do not change it to match the reference.
-- A quantity not in the document gets added to it in the same change that introduces it.
+- A quantity not in the document gets added to it in the same change that introduces it; its local name, if any, goes in `CONTRIBUTING.md`.
   Propose the symbol, say which existing convention it follows, and get agreement before using it widely.

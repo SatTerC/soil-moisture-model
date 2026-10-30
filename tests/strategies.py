@@ -15,7 +15,7 @@ PARAM_BOUNDS = {
     "field_capacity_fraction": (0.40, 0.95),
     "nominal_clay": (5.0, 60.0),
     "clay_sensitivity": (0.0, 0.10),
-    "reference_et_coefficient": (0.1, 1.5),
+    "reference_et_coefficient": (0.05, 0.5),
     "biomass_half_saturation": (20.0, 800.0),
 }
 

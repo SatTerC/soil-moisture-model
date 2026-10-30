@@ -75,9 +75,11 @@ class SoilWaterParams:
     clay_sensitivity: FloatOrArray = 0.04
     r"""Strength of the clay-content adjustment to the soil properties, $\kappa$
     (per percent clay, scaled by 1/100)."""
-    reference_et_coefficient: FloatOrArray = 0.55
+    reference_et_coefficient: FloatOrArray = 0.15
     r"""Reference evapotranspiration per degree-day above the base temperature,
-    $c_{ET}$ (mm per degC per day)."""
+    $c_{ET}$ (mm per degC per day). The default matches the temperate humid
+    row of `[FAO56]` Table 2, 1-2 mm per day at 10 degC and 2-4 mm per day at
+    20 degC."""
     biomass_half_saturation: FloatOrArray = 150.0
     r"""Biomass at which the biomass saturation reaches 1/2, $K_B$ (grams of
     carbon per square metre)."""

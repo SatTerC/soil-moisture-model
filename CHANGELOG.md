@@ -16,6 +16,13 @@ Refactors that leave outputs unchanged are not listed.
 
 ### Changed
 
+- **The default reference ET coefficient is 0.15 mm °C⁻¹ day⁻¹, down from 0.55.**
+  At 0.55 the degree-day relation gave 5.5 mm per day of reference evapotranspiration at 10 °C and 11 mm per day at 20 °C.
+  `[FAO56]` Table 2 gives 1–2 and 2–4 mm per day for humid and sub-humid temperate regions, so 0.15 sits in the middle of both.
+  FAO56 offers that table for orientation, not for direct use; the value is a literature default until the model is recalibrated.
+  The calibration bounds narrow from (0.1, 1.5) to (0.05, 0.5), which covers every row of Table 2, so calibration cannot restore the old demand.
+  In `temperate_default`, annual potential evapotranspiration falls from 1760 to 480 mm and actual evapotranspiration from 682 to 379 mm; mean soil moisture rises from 79 to 130 mm, and runoff and drainage rise to carry the extra water.
+  The `dry_sandy` regression scenario now sets an arid coefficient of 0.3 and a 60 mm store, so that it still empties the store.
 - **Bucket overflow is now runoff.**
   Previously, when infiltration would have filled the store beyond its capacity, the excess was silently discarded, so water was not conserved.
   It is now added to `runoff` as saturation excess.

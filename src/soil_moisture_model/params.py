@@ -28,8 +28,8 @@ def _check(name: str, value: ArrayLike, lo: float, hi: float, *, open_lo: bool) 
 # name -> (lower bound, upper bound, lower bound excluded?)
 _PARAM_RANGES: dict[str, tuple[float, float, bool]] = {
     "nominal_soil_water_capacity": (0.0, np.inf, True),
-    "nominal_drainage_coefficient": (0.0, 1.0, False),
-    "nominal_max_runoff_fraction": (0.0, 1.0, False),
+    "drainage_coefficient": (0.0, 1.0, False),
+    "max_runoff_fraction": (0.0, 1.0, False),
     "runoff_exponent": (0.0, np.inf, True),
     "field_capacity_fraction": (0.0, 1.0, True),
     "nominal_clay": (0.0, 100.0, False),
@@ -57,12 +57,12 @@ class SoilWaterParams:
     nominal_soil_water_capacity: FloatOrArray = 160.0
     r"""Soil water capacity at the nominal clay content, $S_{\max}^{\circ}$
     (mm)."""
-    nominal_drainage_coefficient: FloatOrArray = 0.10
-    r"""Fraction of water above field capacity that drains each week, at the
-    nominal clay content, $k_d^{\circ}$ (dimensionless)."""
-    nominal_max_runoff_fraction: FloatOrArray = 0.45
-    r"""Fraction of throughfall that runs off when the store is full, at the
-    nominal clay content, $r_{\max}^{\circ}$ (dimensionless)."""
+    drainage_coefficient: FloatOrArray = 0.10
+    r"""Fraction of water above field capacity that drains each week, $k_d$
+    (dimensionless)."""
+    max_runoff_fraction: FloatOrArray = 0.45
+    r"""Fraction of throughfall that runs off when the store is full,
+    $r_{\max}$ (dimensionless)."""
     runoff_exponent: FloatOrArray = 2.0
     r"""Exponent of relative soil moisture in the runoff fraction, $\gamma$
     (dimensionless)."""
@@ -140,17 +140,5 @@ class ModelConstants:
     # --- Clay effects ---
     clay_bounds: tuple[float, float] = (0.0, 80.0)
     """Clip bounds applied to the input clay content (percent)."""
-    drainage_clay_response: float = 0.5
-    r"""Relative strength of the clay effect on the drainage coefficient, which
-    it reduces, $a_d$ (dimensionless)."""
-    runoff_clay_response: float = 0.5
-    r"""Relative strength of the clay effect on the maximum runoff fraction,
-    which it increases, $a_r$ (dimensionless)."""
     soil_water_capacity_bounds: tuple[float, float] = (60.0, 320.0)
     """Clip bounds of the clay-adjusted soil water capacity (mm)."""
-    drainage_coefficient_bounds: tuple[float, float] = (0.015, 0.25)
-    """Clip bounds of the clay-adjusted drainage coefficient
-    (dimensionless)."""
-    max_runoff_fraction_bounds: tuple[float, float] = (0.05, 0.90)
-    """Clip bounds of the clay-adjusted maximum runoff fraction
-    (dimensionless)."""

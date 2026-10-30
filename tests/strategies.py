@@ -9,8 +9,8 @@ from soil_moisture_model import SoilWaterParams
 # Calibration bounds, from scripts/calibrate_icos.py.
 PARAM_BOUNDS = {
     "nominal_soil_water_capacity": (60.0, 400.0),
-    "nominal_drainage_coefficient": (0.01, 0.30),
-    "nominal_max_runoff_fraction": (0.02, 0.95),
+    "drainage_coefficient": (0.01, 0.30),
+    "max_runoff_fraction": (0.02, 0.95),
     "runoff_exponent": (0.5, 4.0),
     "field_capacity_fraction": (0.40, 0.95),
     "nominal_clay": (5.0, 60.0),

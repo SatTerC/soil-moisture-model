@@ -219,11 +219,11 @@ def simulate(
     interception = np.minimum(np.minimum(precip, interception_cap), potential_et)
     throughfall = precip - interception
     demand_on_store = potential_et - interception
-    k_d = soil.drainage_coefficient
+    k_d = params.drainage_coefficient
     k_d_eff = np.where(frozen, k_d * c.frozen_drainage_multiplier, k_d)
 
     s_max = np.broadcast_to(soil.soil_water_capacity, space)
-    r_max = soil.max_runoff_fraction
+    r_max = params.max_runoff_fraction
     s_fc = params.field_capacity_fraction * s_max
     # [FAO56] eq. (84) with TAW = S_fc and depletion S_fc - S+: stress below this.
     stress_onset = (1.0 - c.depletion_fraction) * s_fc

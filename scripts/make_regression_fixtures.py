@@ -196,10 +196,6 @@ def build_scenarios() -> list[Scenario]:
             requires={
                 "clay_clipped": lambda c: c["clay_clipped"],
                 "capacity_clipped": lambda c: c["capacity_clipped"],
-                "drainage_coeff_clipped": lambda c: c["drainage_coeff_clipped"],
-                "runoff_fraction_max_clipped": lambda c: c[
-                    "runoff_fraction_max_clipped"
-                ],
             },
         ),
         Scenario(
@@ -215,10 +211,6 @@ def build_scenarios() -> list[Scenario]:
             params=PARAMS_LOW,
             requires={
                 "capacity_clipped": lambda c: c["capacity_clipped"],
-                "drainage_coeff_clipped": lambda c: c["drainage_coeff_clipped"],
-                "runoff_fraction_max_clipped": lambda c: c[
-                    "runoff_fraction_max_clipped"
-                ],
             },
         ),
         Scenario(
@@ -314,8 +306,6 @@ def coverage_counts(scenario: Scenario, out: dict[str, np.ndarray]) -> dict:
     clay = float(np.clip(scenario.clay_pct, 0.0, 80.0))
     dclay = (clay - p["reference_clay_pct"]) * p["clay_sensitivity"] / 100.0
     raw_capacity = p["base_soil_water_capacity_mm"] * (1.0 + dclay)
-    raw_drainage = p["base_drainage_coeff"] * (1.0 - 0.5 * dclay)
-    raw_runoff = p["base_runoff_fraction_max"] * (1.0 + 0.5 * dclay)
 
     return {
         "frozen_weeks": int(np.sum(out["frozen_soil"])),
@@ -326,12 +316,6 @@ def coverage_counts(scenario: Scenario, out: dict[str, np.ndarray]) -> dict:
         "negative_biomass_weeks": int(np.sum(scenario.biomass_gC_m2 < 0.0)),
         "clay_clipped": bool(clay != scenario.clay_pct),
         "capacity_clipped": bool(not np.isclose(raw_capacity, capacity)),
-        "drainage_coeff_clipped": bool(
-            not np.isclose(raw_drainage, float(out["drainage_coeff"]))
-        ),
-        "runoff_fraction_max_clipped": bool(
-            not np.isclose(raw_runoff, float(out["runoff_fraction_max"]))
-        ),
     }
 
 

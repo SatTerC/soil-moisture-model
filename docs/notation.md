@@ -97,7 +97,7 @@ Soil moisture and its derived stores, mm, shape `(time, *space)` unless noted.
 ## Soil properties and clay
 
 Per pixel, shape `space`.
-The clay-adjusted properties are the nominal values scaled by the clay offset $\Delta$ and clipped.
+The soil water capacity is the nominal value scaled by the clay offset $\Delta$ and clipped.
 
 | Concept | Math | Units | Code | Note |
 |---|---|---|---|---|
@@ -105,11 +105,10 @@ The clay-adjusted properties are the nominal values scaled by the clay offset $\
 | nominal clay content | $C^{\circ}$ | percent | `nominal_clay` | |
 | clay sensitivity | $\kappa$ | — | `clay_sensitivity` | |
 | clay offset | $\Delta = \kappa\,(C - C^{\circ})/100$ | — | — | |
-| drainage coefficient | $k_d$, nominal $k_d^{\circ}$ | — (fraction per week) | `drainage_coefficient`, `nominal_drainage_coefficient` | |
-| maximum runoff fraction | $r_{\max}$, nominal $r_{\max}^{\circ}$ | — | `max_runoff_fraction`, `nominal_max_runoff_fraction` | |
+| drainage coefficient | $k_d$ | — (fraction per week) | `drainage_coefficient` | not clay-adjusted |
+| maximum runoff fraction | $r_{\max}$ | — | `max_runoff_fraction` | not clay-adjusted |
 | runoff exponent | $\gamma$ | — | `runoff_exponent` | not clay-adjusted |
 | field-capacity fraction | $\phi_{fc}$ | — | `field_capacity_fraction` | not clay-adjusted |
-| clay response factors | $a_d$, $a_r$ | — | `drainage_clay_response`, `runoff_clay_response` | subscripts are labels |
 
 $\theta$ is reserved for volumetric water content (m³ m⁻³), as in `[FAO56]` and sgam.
 This model has no volumetric water content, so $\theta$ does not appear; $\phi_{fc}$ and $S_r$ are fractions of the soil water capacity.
@@ -155,7 +154,7 @@ Clip bounds have no symbols; they are named only in `ModelConstants` and written
 | superscript $\mathrm{eff}$ | after the frozen-week adjustment | $k_d^{\mathrm{eff}}$ |
 | subscript $t$ | week index, $t = 1, \dots, n_t$ | $S_t$ |
 | subscript $0$ | before the first week, $t = 0$ | $S_0$, the initial soil moisture |
-| superscript $\circ$ | nominal value, at the nominal clay content | $S_{\max}^{\circ}$, $k_d^{\circ}$, $C^{\circ}$ |
+| superscript $\circ$ | nominal value, at the nominal clay content | $S_{\max}^{\circ}$, $C^{\circ}$ |
 
 Subscript $0$ means $t = 0$ and nothing else.
 In code names the circle becomes the prefix `nominal_`, as in `nominal_soil_water_capacity`.

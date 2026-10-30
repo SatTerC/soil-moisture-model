@@ -39,8 +39,8 @@ def test_initial_store_clipped_to_capacity():
     "bad",
     [
         {"nominal_soil_water_capacity": 0.0},
-        {"nominal_drainage_coefficient": 1.5},
-        {"nominal_max_runoff_fraction": -0.1},
+        {"drainage_coefficient": 1.5},
+        {"max_runoff_fraction": -0.1},
         {"runoff_exponent": 0.0},
         {"field_capacity_fraction": 1.2},
         {"biomass_half_saturation": 0.0},

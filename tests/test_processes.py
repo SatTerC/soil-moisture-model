@@ -73,15 +73,11 @@ class TestSoilProperties:
         p = SoilWaterParams()
         s = soil_properties(p.nominal_clay, p)
         assert s.soil_water_capacity == p.nominal_soil_water_capacity
-        assert s.drainage_coefficient == p.nominal_drainage_coefficient
-        assert s.max_runoff_fraction == p.nominal_max_runoff_fraction
 
-    def test_more_clay_means_more_storage_and_runoff_less_drainage(self):
+    def test_more_clay_means_more_storage(self):
         p = SoilWaterParams()
         lo, hi = soil_properties(10.0, p), soil_properties(60.0, p)
         assert hi.soil_water_capacity > lo.soil_water_capacity
-        assert hi.max_runoff_fraction > lo.max_runoff_fraction
-        assert hi.drainage_coefficient < lo.drainage_coefficient
 
     def test_clay_clipped_to_bounds(self):
         p = SoilWaterParams()
@@ -92,10 +88,6 @@ class TestSoilProperties:
         [
             ({"nominal_soil_water_capacity": 1000.0}, "soil_water_capacity", 1),
             ({"nominal_soil_water_capacity": 10.0}, "soil_water_capacity", 0),
-            ({"nominal_drainage_coefficient": 1.0}, "drainage_coefficient", 1),
-            ({"nominal_drainage_coefficient": 0.0}, "drainage_coefficient", 0),
-            ({"nominal_max_runoff_fraction": 1.0}, "max_runoff_fraction", 1),
-            ({"nominal_max_runoff_fraction": 0.0}, "max_runoff_fraction", 0),
         ],
     )
     def test_property_clipped(self, params, attr, bound):

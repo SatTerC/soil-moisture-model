@@ -12,7 +12,7 @@ Symbols and terms follow [Notation](notation.md).
 
 Three things set the store's behaviour:
 
-- **Soil texture.** Clay content changes the soil water capacity, drainage and runoff.
+- **Soil texture.** Clay content changes the soil water capacity.
 - **Vegetation.** Plant biomass controls canopy interception and the crop coefficient.
 - **Climate.** Temperature drives evaporative demand and decides whether a week is frozen; precipitation supplies water.
 
@@ -138,7 +138,7 @@ $$
 
 ## Clay effects
 
-The calibrated soil parameters are nominal values, marked $\circ$, for a soil with the nominal clay content $C^{\circ}$.
+The soil water capacity is calibrated as a nominal value $S_{\max}^{\circ}$, for a soil with the nominal clay content $C^{\circ}$.
 For clay content $C$ (percent, clipped to between 0 and 80), let
 
 $$
@@ -146,18 +146,14 @@ $$
 $$
 
 with clay sensitivity $\kappa$.
-Each property is scaled linearly in the clay offset $\Delta$, with clay response factors $a_d$ and $a_r$, then clipped to a plausible range:
+The soil water capacity is scaled linearly in the clay offset $\Delta$, then clipped to a plausible range:
 
 $$
-\begin{aligned}
-S_{\max} &= S_{\max}^{\circ}\,(1 + \Delta) \\
-k_d      &= k_d^{\circ}\,(1 - a_d \Delta) \\
-r_{\max} &= r_{\max}^{\circ}\,(1 + a_r \Delta)
-\end{aligned}
+S_{\max} = S_{\max}^{\circ}\,(1 + \Delta)
 $$
 
-More clay therefore means more storage, slower drainage and more runoff.
-A single shared sensitivity $\kappa$ keeps the parameter count down.
+More clay therefore means more storage.
+The drainage coefficient $k_d$ and maximum runoff fraction $r_{\max}$ are calibrated directly and do not depend on clay.
 
 ## Frozen weeks
 

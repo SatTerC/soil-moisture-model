@@ -11,8 +11,8 @@ from soil_moisture_model import SoilWaterParams, simulate
 # legacy SoilWaterParams field -> current SoilWaterParams field
 PARAM_NAMES = {
     "base_soil_water_capacity_mm": "nominal_soil_water_capacity",
-    "base_drainage_coeff": "nominal_drainage_coefficient",
-    "base_runoff_fraction_max": "nominal_max_runoff_fraction",
+    "base_drainage_coeff": "drainage_coefficient",
+    "base_runoff_fraction_max": "max_runoff_fraction",
     "runoff_exponent": "runoff_exponent",
     "field_capacity_fraction": "field_capacity_fraction",
     "reference_clay_pct": "nominal_clay",
@@ -51,6 +51,4 @@ def run_scenario(inputs: dict) -> dict[str, np.ndarray]:
         "soil_moisture_mm": out.soil_moisture,
         "relative_soil_moisture": out.relative_soil_moisture,
         "soil_water_capacity_mm": out.soil.soil_water_capacity,
-        "drainage_coeff": out.soil.drainage_coefficient,
-        "runoff_fraction_max": out.soil.max_runoff_fraction,
     }

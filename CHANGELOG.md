@@ -23,6 +23,12 @@ Refactors that leave outputs unchanged are not listed.
 
 ### Changed
 
+- **Drainage and runoff no longer depend on clay.**
+  The drainage coefficient and maximum runoff fraction were nominal values scaled by the clay offset $\Delta$ and clipped.
+  Within the calibration bounds $|\Delta| \le 0.075$, so the scaling changed either by at most 4 %, and only the clips ever did much.
+  Both are now calibrated directly: `SoilWaterParams.nominal_drainage_coefficient` and `nominal_max_runoff_fraction` become `drainage_coefficient` and `max_runoff_fraction`.
+  Removed: `ModelConstants.drainage_clay_response`, `runoff_clay_response`, `drainage_coefficient_bounds`, `max_runoff_fraction_bounds`, and the `drainage_coefficient` and `max_runoff_fraction` fields of `SoilProperties`.
+  Default-parameter scenarios change by less than 2 % in any annual flux; `clipped_low`, whose drainage coefficient had been clipped from 0.01 up to 0.015, drains 17 instead of 26 mm a year.
 - **The water-stress coefficient is `[FAO56]` eq. (84).**
   It was a power law, $K_s = (S^{+}/S_{\max})^{\beta}$, with $\beta = 1.4$ adjusted for clay, so evapotranspiration was reduced at any store below full capacity.
   It is now $K_s = \min(1, S^{+} / ((1 - p) S_{fc}))$: `[FAO56]` eq. (84) with the field capacity $S_{fc}$ as the total available water.

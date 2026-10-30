@@ -238,12 +238,6 @@ class SoilProperties:
 
     soil_water_capacity: NDArray[np.float64]
     r"""Soil water capacity, $S_{\max}$ (mm)."""
-    drainage_coefficient: NDArray[np.float64]
-    """Drainage coefficient, the fraction of water above field capacity drained
-    per week, $k_d$ (dimensionless)."""
-    max_runoff_fraction: NDArray[np.float64]
-    r"""Maximum runoff fraction, the fraction of throughfall that runs off when
-    the store is full, $r_{\max}$ (dimensionless)."""
 
 
 def soil_properties(
@@ -259,28 +253,24 @@ def soil_properties(
     \Delta = \kappa \, \frac{C - C^{\circ}}{100},
     $$
 
-    each property is scaled linearly in $\Delta$ and then clipped to its bounds:
+    the soil water capacity is scaled linearly in $\Delta$ and then clipped to its
+    bounds:
 
     $$
-    \begin{aligned}
-    S_{\max} &= S_{\max}^{\circ}\,(1 + \Delta) \\
-    k_d      &= k_d^{\circ}\,(1 - a_d \Delta) \\
-    r_{\max} &= r_{\max}^{\circ}\,(1 + a_r \Delta)
-    \end{aligned}
+    S_{\max} = S_{\max}^{\circ}\,(1 + \Delta)
     $$
 
-    So more clay means more storage, slower drainage and more runoff.
+    So more clay means more storage.
 
     Parameters
     ----------
     clay
         Soil clay content, $C$ (percent).
     params
-        Supplies the `nominal_*` values $S_{\max}^{\circ}$, $k_d^{\circ}$ and
-        $r_{\max}^{\circ}$, `nominal_clay` ($C^{\circ}$) and `clay_sensitivity`
-        ($\kappa$).
+        Supplies `nominal_soil_water_capacity` ($S_{\max}^{\circ}$),
+        `nominal_clay` ($C^{\circ}$) and `clay_sensitivity` ($\kappa$).
     constants
-        Supplies the clay response factors $a_d$ and $a_r$ and all clip bounds.
+        Supplies the clip bounds.
 
     Returns
     -------
@@ -295,14 +285,5 @@ def soil_properties(
         soil_water_capacity=np.clip(
             params.nominal_soil_water_capacity * (1.0 + delta),
             *c.soil_water_capacity_bounds,
-        ),
-        drainage_coefficient=np.clip(
-            params.nominal_drainage_coefficient
-            * (1.0 - c.drainage_clay_response * delta),
-            *c.drainage_coefficient_bounds,
-        ),
-        max_runoff_fraction=np.clip(
-            params.nominal_max_runoff_fraction * (1.0 + c.runoff_clay_response * delta),
-            *c.max_runoff_fraction_bounds,
         ),
     )

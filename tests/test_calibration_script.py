@@ -44,7 +44,7 @@ def write_site(root: Path, site: str, *, with_swc: bool) -> None:
             "lai": (("time", "lat", "lon"), cube(2 + np.sin(2 * np.pi * week / 52))),
         },
         coords={"time": time, "lat": [50.0], "lon": [5.0]},
-        attrs={"clay_fraction": 25.0},
+        attrs={"sand_fraction": 0.4, "clay_fraction": 0.2},
     )
     (root / "inputs").mkdir(exist_ok=True)
     ds.to_netcdf(root / "inputs" / f"{site}_weekly_final_variables.nc")
@@ -92,10 +92,22 @@ def test_calibrates_and_resumes(calibrate, tmp_path, capsys):
     best = pd.read_parquet(tmp_path / "best_params_by_site.parquet")
     results = pd.read_parquet(tmp_path / "results_all_sites.parquet")
     assert list(best.index) == ["BE-Xxx"]  # DE-Yyy has no SWC, FR-Zzz is filtered out
-    assert np.isfinite(best.loc["BE-Xxx", "calib_rmse"])
+    # Water content in m3 m-3 against SWC / 100: the error is a fraction, not mm.
+    assert 0.0 < best.loc["BE-Xxx", "calib_rmse"] < 0.3
     assert len(results) == N_WEEKS
     assert "Failed sites: 1" in capsys.readouterr().out
 
     calibrate.main(argv)  # second run skips the calibrated site and adds no rows
     assert "Skipping BE-Xxx" in capsys.readouterr().out
     assert len(pd.read_parquet(tmp_path / "results_all_sites.parquet")) == N_WEEKS
+
+
+@pytest.mark.parametrize("value", [-0.1, 1.5, 25.0])
+def test_texture_outside_unit_interval_refused(calibrate, value):
+    with pytest.raises(ValueError, match="not a fraction"):
+        calibrate.texture_fraction("clay_fraction", value)
+
+
+@pytest.mark.parametrize("value", [0.0, 0.25, 1.0])
+def test_texture_fraction_passed_through(calibrate, value):
+    assert calibrate.texture_fraction("clay_fraction", value) == value

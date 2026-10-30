@@ -24,7 +24,8 @@ def test_block_runtime():
         rng.gamma(1.5, 15.0, shape),
         rng.uniform(0.0, 600.0, shape),
         rng.uniform(0.0, 3000.0, N_PIXELS),
-        rng.uniform(0.0, 80.0, N_PIXELS),
+        rng.uniform(0.1, 0.6, N_PIXELS),
+        rng.uniform(0.05, 0.4, N_PIXELS),
     )
     start = time.perf_counter()
     simulate(*args)

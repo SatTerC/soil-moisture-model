@@ -8,14 +8,12 @@ from soil_moisture_model import SoilWaterParams
 
 # Calibration bounds, from scripts/calibrate_icos.py.
 PARAM_BOUNDS = {
-    "nominal_soil_water_capacity": (60.0, 400.0),
-    "nominal_drainage_coefficient": (0.01, 0.30),
-    "nominal_max_runoff_fraction": (0.02, 0.95),
+    "drainage_coefficient": (0.01, 0.30),
+    "max_runoff_fraction": (0.02, 0.95),
     "runoff_exponent": (0.5, 4.0),
-    "field_capacity_fraction": (0.40, 0.95),
-    "nominal_clay": (5.0, 60.0),
-    "clay_sensitivity": (0.0, 0.10),
-    "reference_et_coefficient": (0.1, 1.5),
+    "rooting_depth": (0.2, 3.0),
+    "depletion_fraction": (0.1, 0.8),
+    "reference_et_coefficient": (0.05, 0.5),
     "biomass_half_saturation": (20.0, 800.0),
 }
 
@@ -30,6 +28,16 @@ params = st.builds(
 
 
 @st.composite
+def texture(draw, n_pixel):
+    """Sand, clay and organic matter fractions where `[SR06]` gives ordered values."""
+    sand = draw(arrays(float, n_pixel, elements=_floats(0.05, 0.9)))
+    clay_share = draw(arrays(float, n_pixel, elements=_floats(0.0, 1.0)))
+    clay = 0.02 + clay_share * (np.minimum(0.55, 1.0 - sand) - 0.02)
+    om = draw(arrays(float, n_pixel, elements=_floats(0.0, 0.08)))
+    return {"sand": sand, "clay": clay, "organic_matter": om}
+
+
+@st.composite
 def model_inputs(draw):
     n_time = draw(st.integers(1, 60))
     n_pixel = draw(st.integers(1, 3))
@@ -39,7 +47,7 @@ def model_inputs(draw):
         "precipitation": draw(arrays(float, shape, elements=_floats(0.0, 300.0))),
         "biomass": draw(arrays(float, shape, elements=_floats(0.0, 2000.0))),
         "elevation": draw(arrays(float, n_pixel, elements=_floats(-400.0, 6000.0))),
-        "clay": draw(arrays(float, n_pixel, elements=_floats(0.0, 100.0))),
+        **draw(texture(n_pixel)),
         "initial_soil_moisture": draw(
             arrays(float, n_pixel, elements=_floats(0.0, 500.0))
         ),

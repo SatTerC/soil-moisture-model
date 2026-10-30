@@ -1,12 +1,14 @@
 r"""Weekly bucket model of soil moisture.
 
 `simulate` steps a single-layer soil water store forward one week at a time.
+The store holds the water above the wilting point over the rooting depth; its
+field capacity and saturation come from soil texture.
 Each week, precipitation is split into canopy interception and throughfall;
 throughfall is split into runoff and infiltration; evapotranspiration is drawn
 from the store, limited by the water-stress coefficient; and water above field
 capacity drains. Frozen weeks (weekly mean air temperature below
-`ModelConstants.freezing_temperature`) infiltrate less and evaporate, take up and
-drain more slowly.
+`ModelConstants.freezing_temperature`) infiltrate less, and evaporate and drain
+more slowly.
 
 The drivers are time-leading arrays of shape ``(time, *space)``. Site inputs and
 every field of `SoilWaterParams` broadcast against ``space``, so a whole block
@@ -25,10 +27,9 @@ from .processes import (
     biomass_saturation,
     crop_coefficient,
     interception_capacity,
-    reference_evapotranspiration,
     soil_properties,
-    uptake_factor,
 )
+from .processes import reference_evapotranspiration as degree_day_reference_et
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,9 @@ class SoilWaterOutput:
 
     soil_moisture: NDArray[np.float64]
     """Soil moisture at the end of the week, $S_t$ (mm)."""
+    soil_water_content: NDArray[np.float64]
+    r"""Volumetric soil water content over the rooting depth at the end of the
+    week, $\theta = \theta_{WP} + S_t / (1000 Z_r)$ (m3 per m3)."""
     relative_soil_moisture: NDArray[np.float64]
     r"""Relative soil moisture, the soil moisture as a fraction of the soil water
     capacity, $S_r = S_t / S_{\max}$ (dimensionless)."""
@@ -48,21 +52,19 @@ class SoilWaterOutput:
     week)."""
     potential_evapotranspiration: NDArray[np.float64]
     r"""Evapotranspiration if soil moisture were not limiting: effective reference
-    evapotranspiration times crop coefficient times effective uptake factor,
-    $ET_p = u^{\mathrm{eff}} K_c\, ET_o^{\mathrm{eff}}$ (mm per week)."""
+    evapotranspiration times crop coefficient, $ET_p = K_c\, ET_o^{\mathrm{eff}}$
+    (mm per week)."""
     reference_evapotranspiration: NDArray[np.float64]
     """Temperature- and elevation-driven evaporative demand, before the
     frozen-week adjustment, $ET_o$ (mm per week)."""
     crop_coefficient: NDArray[np.float64]
     """Biomass-dependent crop coefficient, $K_c$ (dimensionless)."""
-    uptake_factor: NDArray[np.float64]
-    """Biomass-dependent uptake factor, before the frozen-week adjustment, $u$
-    (dimensionless)."""
     interception_capacity: NDArray[np.float64]
     r"""Biomass-dependent interception capacity, $f_B\, I_{\max}$ (mm per
     week)."""
     interception: NDArray[np.float64]
-    """Precipitation intercepted by the canopy and evaporated, $I$ (mm per
+    """Precipitation intercepted by the canopy and evaporated, at most the
+    interception capacity and the potential evapotranspiration, $I$ (mm per
     week)."""
     throughfall: NDArray[np.float64]
     """Precipitation reaching the soil surface, $P_T$ (mm per week)."""
@@ -77,11 +79,14 @@ class SoilWaterOutput:
     frozen: NDArray[np.bool_]
     r"""Whether the week was frozen, $T < T_{\mathrm{frz}}$."""
     soil: SoilProperties
-    """Clay-adjusted soil properties, with shape ``space``."""
+    """Soil properties from texture and rooting depth, with shape ``space``."""
 
     @property
     def total_evaporative_loss(self) -> NDArray[np.float64]:
-        """Actual evapotranspiration plus interception (mm per week)."""
+        """Actual evapotranspiration plus interception (mm per week).
+
+        At most the potential evapotranspiration, $ET_p$.
+        """
         return self.actual_evapotranspiration + self.interception
 
 
@@ -90,32 +95,36 @@ def simulate(
     precipitation: ArrayLike,
     biomass: ArrayLike,
     elevation: ArrayLike,
+    sand: ArrayLike,
     clay: ArrayLike,
     *,
-    initial_soil_moisture: ArrayLike = 50.0,
+    organic_matter: ArrayLike = 0.025,
+    initial_soil_moisture: ArrayLike | None = None,
+    reference_evapotranspiration: ArrayLike | None = None,
     params: SoilWaterParams | None = None,
     constants: ModelConstants | None = None,
 ) -> SoilWaterOutput:
     r"""Run the weekly soil water balance.
 
-    Each week $t$, starting from store $S_{t-1}$:
+    The store $S$ is the water above the wilting point over the rooting depth,
+    with field capacity $S_{fc}$ and soil water capacity $S_{\max}$ from
+    `soil_properties`. Each week $t$, starting from store $S_{t-1}$:
 
-    1. Interception $I = \min(P, f_B I_{\max})$, throughfall $P_T = P - I$.
-    2. Surface runoff $Q_s = r_{\max} (S_{t-1}/S_{\max})^{\gamma} P_T$, or
+    1. Potential evapotranspiration $ET_p = K_c\, ET_o^{\mathrm{eff}}$.
+    2. Interception $I = \min(P, f_B I_{\max}, ET_p)$, throughfall $P_T = P - I$.
+    3. Surface runoff $Q_s = r_{\max} (S_{t-1}/S_{\max})^{\gamma} P_T$, or
        $(1 - \phi^{\mathrm{frz}}) P_T$ in a frozen week.
-    3. Saturation excess $Q_e = \max(S_{t-1} + P_T - Q_s - S_{\max}, 0)$ also
+    4. Saturation excess $Q_e = \max(S_{t-1} + P_T - Q_s - S_{\max}, 0)$ also
        runs off: total runoff $Q = Q_s + Q_e$, infiltration $F = P_T - Q$.
-    4. Store after infiltration $S^{+}_t = S_{t-1} + F \le S_{\max}$.
-    5. Water-stress coefficient $K_s = (S^{+}_t / S_{\max})^{\beta}$.
-    6. Potential evapotranspiration $ET_p = u^{\mathrm{eff}} K_c\, ET_o^{\mathrm{eff}}$.
-    7. Actual evapotranspiration $ET_a = \min(K_s\, ET_p,\; S^{+}_t)$.
-    8. Drainage $D = k_d^{\mathrm{eff}} \max(S^{+}_t - ET_a - S_{fc}, 0)$, with
-       field capacity $S_{fc} = \phi_{fc} S_{\max}$.
+    5. Store after infiltration $S^{+}_t = S_{t-1} + F \le S_{\max}$.
+    6. Water-stress coefficient $K_s = \min(1,\; S^{+}_t / ((1 - p) S_{fc}))$,
+       `[FAO56]` eq. (84).
+    7. Actual evapotranspiration $ET_a = \min(K_s\, (ET_p - I),\; S^{+}_t)$.
+    8. Drainage $D = k_d^{\mathrm{eff}} \max(S^{+}_t - ET_a - S_{fc}, 0)$.
     9. $S_t = S^{+}_t - ET_a - D$.
 
     In an unfrozen week the effective values equal the plain ones. In a frozen
-    week, $ET_o^{\mathrm{eff}} = m^{\mathrm{frz}}_{ET} ET_o$,
-    $u^{\mathrm{eff}} = 1 + m^{\mathrm{frz}}_{u} (u - 1)$ and
+    week, $ET_o^{\mathrm{eff}} = m^{\mathrm{frz}}_{ET} ET_o$ and
     $k_d^{\mathrm{eff}} = m^{\mathrm{frz}}_{d} k_d$.
 
     Parameters
@@ -130,12 +139,27 @@ def simulate(
         ``(time, *space)``. Negative values are treated as zero.
     elevation
         Site elevation, $z$ (metres), broadcastable to ``space``.
+    sand
+        Sand fraction by weight, $f_{\mathrm{sand}}$ (dimensionless),
+        broadcastable to ``space``.
     clay
-        Soil clay content, $C$ (percent), broadcastable to ``space``.
+        Clay fraction by weight, $f_{\mathrm{clay}}$ (dimensionless),
+        broadcastable to ``space``.
+    organic_matter
+        Organic matter fraction by weight, $f_{\mathrm{om}}$ (dimensionless),
+        broadcastable to ``space``. The default, 0.025, is a typical mineral
+        topsoil.
     initial_soil_moisture
         Initial soil moisture, before the first week, $S_0$ (mm), broadcastable
-        to ``space``.
-        Clipped to the soil water capacity.
+        to ``space``. Clipped to the soil water capacity. Defaults to field
+        capacity.
+    reference_evapotranspiration
+        Weekly reference evapotranspiration, $ET_o$ (mm), shape
+        ``(time, *space)``, from any method, such as `[FAO56]` Penman-Monteith.
+        Replaces the degree-day relation, so `elevation` and
+        `SoilWaterParams.reference_et_coefficient` are then unused. The
+        frozen-week adjustment still applies. Negative values are treated as
+        zero.
     params
         Calibrated parameters. Defaults to `SoilWaterParams()`.
     constants
@@ -144,7 +168,7 @@ def simulate(
     Returns
     -------
     SoilWaterOutput
-        Weekly fluxes and states, and the clay-adjusted soil properties.
+        Weekly fluxes and states, and the soil properties.
 
     Raises
     ------
@@ -163,22 +187,27 @@ def simulate(
     temp = np.asarray(temperature, dtype=float)
     precip = np.maximum(np.asarray(precipitation, dtype=float), 0.0)
     bio = np.asarray(biomass, dtype=float)
-    if temp.ndim == 0 or precip.ndim == 0 or bio.ndim == 0:
+    supplied_et = (
+        None
+        if reference_evapotranspiration is None
+        else np.maximum(np.asarray(reference_evapotranspiration, dtype=float), 0.0)
+    )
+    drivers = [x for x in (temp, precip, bio, supplied_et) if x is not None]
+    if any(x.ndim == 0 for x in drivers):
         raise ValueError("drivers must have a leading time dimension")
     n_time = temp.shape[0]
-    if precip.shape[0] != n_time or bio.shape[0] != n_time:
+    if any(x.shape[0] != n_time for x in drivers):
         raise ValueError(
             "drivers must share their leading (time) dimension, got "
-            f"{temp.shape}, {precip.shape} and {bio.shape}"
+            + ", ".join(str(x.shape) for x in drivers)
         )
 
-    soil = soil_properties(clay, params, c)
+    soil = soil_properties(sand, clay, organic_matter, params)
     space = np.broadcast_shapes(
-        temp.shape[1:],
-        precip.shape[1:],
-        bio.shape[1:],
+        *(x.shape[1:] for x in drivers),
         np.shape(elevation),
-        np.shape(initial_soil_moisture),
+        np.shape(0.0 if initial_soil_moisture is None else initial_soil_moisture),
+        np.shape(soil.water_content_at_wilting_point),
         np.shape(soil.soil_water_capacity),
         *(np.shape(v) for v in params.as_dict().values()),
     )
@@ -190,29 +219,35 @@ def simulate(
     frozen = temp < c.freezing_temperature
     f_b = biomass_saturation(bio, params.biomass_half_saturation)
     k_c = crop_coefficient(f_b, c)
-    u = uptake_factor(f_b, c)
     interception_cap = interception_capacity(f_b, c)
-    interception = np.minimum(precip, interception_cap)
-    throughfall = precip - interception
 
-    reference_et = reference_evapotranspiration(
-        temp, elevation, params.reference_et_coefficient, c
-    )
+    if supplied_et is None:
+        reference_et = degree_day_reference_et(
+            temp, elevation, params.reference_et_coefficient, c
+        )
+    else:
+        reference_et = np.broadcast_to(supplied_et, shape).copy()
     reference_et_eff = np.where(
         frozen, reference_et * c.frozen_reference_et_multiplier, reference_et
     )
-    u_eff = np.where(frozen, 1.0 + (u - 1.0) * c.frozen_uptake_multiplier, u)
-    potential_et = reference_et_eff * k_c * u_eff
-    k_d = soil.drainage_coefficient
+    potential_et = reference_et_eff * k_c
+    # Intercepted water evaporates only as far as demand allows, and the energy
+    # it uses is not available to draw water from the store.
+    interception = np.minimum(np.minimum(precip, interception_cap), potential_et)
+    throughfall = precip - interception
+    demand_on_store = potential_et - interception
+    k_d = params.drainage_coefficient
     k_d_eff = np.where(frozen, k_d * c.frozen_drainage_multiplier, k_d)
 
     s_max = np.broadcast_to(soil.soil_water_capacity, space)
-    r_max = soil.max_runoff_fraction
-    beta = soil.stress_exponent
-    s_fc = params.field_capacity_fraction * s_max
+    r_max = params.max_runoff_fraction
+    s_fc = np.broadcast_to(soil.field_capacity, space)
+    # [FAO56] eq. (84) with TAW = S_fc and depletion S_fc - S+: stress below this.
+    stress_onset = (1.0 - params.depletion_fraction) * s_fc
     frozen_runoff = (1.0 - c.frozen_infiltration_fraction) * throughfall
 
-    s = np.clip(np.broadcast_to(initial_soil_moisture, space), 0.0, s_max)
+    s0 = s_fc if initial_soil_moisture is None else initial_soil_moisture
+    s = np.clip(np.broadcast_to(s0, space), 0.0, s_max)
     soil_moisture = np.empty(shape)
     runoff = np.empty(shape)
     drainage = np.empty(shape)
@@ -228,8 +263,10 @@ def simulate(
         soil_moisture_after_infiltration = np.minimum(
             s_max, s + throughfall[t] - runoff[t]
         )
-        k_s[t] = np.clip((soil_moisture_after_infiltration / s_max) ** beta, 0.0, 1.0)
-        aet[t] = np.minimum(potential_et[t] * k_s[t], soil_moisture_after_infiltration)
+        k_s[t] = np.minimum(soil_moisture_after_infiltration / stress_onset, 1.0)
+        aet[t] = np.minimum(
+            demand_on_store[t] * k_s[t], soil_moisture_after_infiltration
+        )
         after_et = soil_moisture_after_infiltration - aet[t]
         drainage[t] = k_d_eff[t] * np.maximum(after_et - s_fc, 0.0)
         s = np.clip(after_et - drainage[t], 0.0, s_max)
@@ -238,11 +275,14 @@ def simulate(
     return SoilWaterOutput(
         soil_moisture=soil_moisture,
         relative_soil_moisture=soil_moisture / s_max,
+        soil_water_content=(
+            soil.water_content_at_wilting_point
+            + soil_moisture / (1000.0 * np.asarray(params.rooting_depth))
+        ),
         actual_evapotranspiration=aet,
         potential_evapotranspiration=potential_et,
         reference_evapotranspiration=reference_et,
         crop_coefficient=k_c,
-        uptake_factor=u,
         interception_capacity=interception_cap,
         interception=interception,
         throughfall=throughfall,

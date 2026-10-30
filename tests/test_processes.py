@@ -5,13 +5,18 @@ import pytest
 
 from soil_moisture_model import ModelConstants, SoilWaterParams, simulate
 from soil_moisture_model.processes import (
+    atmospheric_pressure,
     biomass_saturation,
     crop_coefficient,
     elevation_et_multiplier,
     interception_capacity,
+    psychrometric_constant,
     reference_evapotranspiration,
+    saturation_vapour_pressure_slope,
     soil_properties,
-    uptake_factor,
+    water_content_at_field_capacity,
+    water_content_at_saturation,
+    water_content_at_wilting_point,
 )
 
 C = ModelConstants()
@@ -39,16 +44,25 @@ def test_biomass_effects_span_their_ranges():
     np.testing.assert_allclose(
         interception_capacity(f), [0.0, C.max_interception_capacity]
     )
-    np.testing.assert_allclose(uptake_factor(f), [1.0, C.max_uptake_factor])
 
 
 class TestElevation:
-    def test_sea_level_is_neutral(self):
-        assert elevation_et_multiplier(0.0) == 1.0
+    def test_fao56_annex_values(self):
+        # [FAO56] Annex 2, Tables 2.1, 2.2 and 2.4
+        assert atmospheric_pressure(0.0) == pytest.approx(101.3)
+        assert atmospheric_pressure(1000.0) == pytest.approx(90.0, abs=0.05)
+        assert psychrometric_constant(1000.0) == pytest.approx(0.060, abs=5e-4)
+        assert saturation_vapour_pressure_slope(20.0) == pytest.approx(0.145, abs=5e-4)
 
-    @pytest.mark.parametrize(("z", "bound"), [(10_000.0, 1), (-10_000.0, 0)])
-    def test_clipped(self, z, bound):
-        assert elevation_et_multiplier(z) == C.elevation_et_multiplier_bounds[bound]
+    def test_sea_level_is_neutral(self):
+        assert elevation_et_multiplier(0.0, [0.0, 10.0, 30.0]) == pytest.approx(1.0)
+
+    def test_rises_with_elevation_and_falls_with_temperature(self):
+        z = np.array([-400.0, 0.0, 1000.0, 3000.0])
+        m = elevation_et_multiplier(z, 20.0)
+        assert np.all(np.diff(m) > 0)
+        assert elevation_et_multiplier(1000.0, 10.0) > m[2]
+        assert m[2] == pytest.approx(1.037, abs=1e-3)
 
 
 def test_reference_evapotranspiration_degree_days():
@@ -58,43 +72,157 @@ def test_reference_evapotranspiration_degree_days():
 
 
 class TestSoilProperties:
-    def test_nominal_clay_gives_nominal_values(self):
-        p = SoilWaterParams()
-        s = soil_properties(p.nominal_clay, p)
-        assert s.soil_water_capacity == p.nominal_soil_water_capacity
-        assert s.drainage_coefficient == p.nominal_drainage_coefficient
-        assert s.max_runoff_fraction == p.nominal_max_runoff_fraction
-        assert s.stress_exponent == C.nominal_stress_exponent
+    LOAM = (0.4, 0.2, 0.025)
 
-    def test_more_clay_means_more_storage_and_runoff_less_drainage(self):
-        p = SoilWaterParams()
-        lo, hi = soil_properties(10.0, p), soil_properties(60.0, p)
-        assert hi.soil_water_capacity > lo.soil_water_capacity
-        assert hi.max_runoff_fraction > lo.max_runoff_fraction
-        assert hi.stress_exponent > lo.stress_exponent
-        assert hi.drainage_coefficient < lo.drainage_coefficient
+    def test_loam_water_contents(self):
+        # Hand calculation from [SR06] eqs. (1), (2), (3) and (5).
+        assert water_content_at_wilting_point(*self.LOAM) == pytest.approx(
+            0.137, abs=5e-4
+        )
+        assert water_content_at_field_capacity(*self.LOAM) == pytest.approx(
+            0.280, abs=5e-4
+        )
+        assert water_content_at_saturation(*self.LOAM) == pytest.approx(0.459, abs=5e-4)
 
-    def test_clay_clipped_to_bounds(self):
-        p = SoilWaterParams()
-        assert soil_properties(500.0, p) == soil_properties(C.clay_bounds[1], p)
+    def test_clay_holds_more_water_than_sand(self):
+        sandy, clayey = (0.8, 0.05, 0.025), (0.2, 0.4, 0.025)
+        for f in (water_content_at_wilting_point, water_content_at_field_capacity):
+            assert f(*clayey) > f(*sandy)
+
+    def test_stores_scale_with_rooting_depth(self):
+        s = soil_properties(*self.LOAM, SoilWaterParams(rooting_depth=0.5))
+        theta_wp = s.water_content_at_wilting_point
+        assert s.field_capacity == pytest.approx(
+            500.0 * (s.water_content_at_field_capacity - theta_wp)
+        )
+        assert s.soil_water_capacity == pytest.approx(
+            500.0 * (s.water_content_at_saturation - theta_wp)
+        )
+        assert 0.0 < s.field_capacity < s.soil_water_capacity
 
     @pytest.mark.parametrize(
-        ("params", "attr", "bound"),
-        [
-            ({"nominal_soil_water_capacity": 1000.0}, "soil_water_capacity", 1),
-            ({"nominal_soil_water_capacity": 10.0}, "soil_water_capacity", 0),
-            ({"nominal_drainage_coefficient": 1.0}, "drainage_coefficient", 1),
-            ({"nominal_drainage_coefficient": 0.0}, "drainage_coefficient", 0),
-            ({"nominal_max_runoff_fraction": 1.0}, "max_runoff_fraction", 1),
-            ({"nominal_max_runoff_fraction": 0.0}, "max_runoff_fraction", 0),
-        ],
+        ("sand", "clay", "organic_matter"),
+        [(1.0, 0.0, 0.0), (0.0, 0.0, 0.5), (0.0, 0.6, 0.2)],
     )
-    def test_property_clipped(self, params, attr, bound):
-        s = soil_properties(25.0, SoilWaterParams(**params))
-        assert getattr(s, attr) == getattr(C, f"{attr}_bounds")[bound]
+    def test_unordered_water_contents_give_nan(self, sand, clay, organic_matter):
+        s = soil_properties(sand, clay, organic_matter, SoilWaterParams())
+        assert np.isnan(s.field_capacity)
+        assert np.isnan(s.soil_water_capacity)
+
+    def test_initial_store_defaults_to_field_capacity(self):
+        out = simulate([-5.0], [0.0], [0.0], 0.0, 0.4, 0.2)
+        assert out.soil_moisture[0] == pytest.approx(out.soil.field_capacity)
+        assert out.soil_water_content[0] == pytest.approx(
+            out.soil.water_content_at_field_capacity
+        )
 
 
 def test_frozen_week_routes_most_throughfall_to_runoff():
-    out = simulate([-5.0], [100.0], [0.0], 0.0, 25.0, initial_soil_moisture=0.0)
+    out = simulate([-5.0], [100.0], [0.0], 0.0, 0.4, 0.2, initial_soil_moisture=0.0)
     assert out.frozen[0]
     assert out.runoff[0] == pytest.approx((1 - C.frozen_infiltration_fraction) * 100.0)
+
+
+class TestSuppliedReferenceEvapotranspiration:
+    rng = np.random.default_rng(0)
+    temp = rng.normal(8.0, 8.0, 104)
+    precip = rng.gamma(1.5, 12.0, 104)
+    biomass = np.full(104, 200.0)
+
+    def test_degree_day_values_reproduce_default_run(self):
+        default = simulate(self.temp, self.precip, self.biomass, 300.0, 0.4, 0.2)
+        supplied = simulate(
+            self.temp,
+            self.precip,
+            self.biomass,
+            300.0,
+            0.4,
+            0.2,
+            reference_evapotranspiration=default.reference_evapotranspiration,
+        )
+        np.testing.assert_array_equal(supplied.soil_moisture, default.soil_moisture)
+
+    def test_replaces_degree_days_and_ignores_elevation(self):
+        et_o = np.full(104, 20.0)
+        low, high = (
+            simulate(
+                self.temp,
+                self.precip,
+                self.biomass,
+                z,
+                0.4,
+                0.2,
+                reference_evapotranspiration=et_o,
+            )
+            for z in (0.0, 3000.0)
+        )
+        np.testing.assert_array_equal(low.soil_moisture, high.soil_moisture)
+        thawed = ~low.frozen
+        np.testing.assert_allclose(
+            low.potential_evapotranspiration[thawed],
+            low.crop_coefficient[thawed] * 20.0,
+        )
+
+    def test_frozen_adjustment_still_applies(self):
+        out = simulate(
+            [-5.0], [0.0], [200.0], 0.0, 0.4, 0.2, reference_evapotranspiration=[10.0]
+        )
+        assert out.potential_evapotranspiration[0] == pytest.approx(
+            C.frozen_reference_et_multiplier * out.crop_coefficient[0] * 10.0
+        )
+
+    def test_time_dimension_must_match(self):
+        with pytest.raises(ValueError, match="leading"):
+            simulate(
+                self.temp,
+                self.precip,
+                self.biomass,
+                0.0,
+                0.4,
+                0.2,
+                reference_evapotranspiration=np.ones(10),
+            )
+
+
+class TestInterception:
+    def test_no_interception_without_demand(self):
+        out = simulate([-5.0], [10.0], [1e6], 0.0, 0.4, 0.2)
+        assert out.interception[0] == 0.0
+        assert out.throughfall[0] == 10.0
+
+    def test_limited_by_demand_and_reduces_it(self):
+        # Large biomass: interception capacity near its maximum, above demand.
+        out = simulate(
+            [10.0],
+            [50.0],
+            [1e6],
+            0.0,
+            0.4,
+            0.2,
+            initial_soil_moisture=1000.0,
+            reference_evapotranspiration=[2.0],
+        )
+        et_p = out.potential_evapotranspiration[0]
+        assert et_p < C.max_interception_capacity
+        assert out.interception[0] == pytest.approx(et_p)
+        assert out.actual_evapotranspiration[0] == pytest.approx(0.0)
+
+
+@pytest.mark.parametrize(
+    ("store_fraction", "k_s"), [(0.0, 0.0), (0.5, 0.5), (1.0, 1.0), (1.5, 1.0)]
+)
+def test_water_stress_follows_fao56_eq_84(store_fraction, k_s):
+    p = SoilWaterParams()
+    onset = (1 - p.depletion_fraction) * soil_properties(
+        0.4, 0.2, 0.025, p
+    ).field_capacity
+    out = simulate(
+        [10.0],
+        [0.0],
+        [0.0],
+        0.0,
+        0.4,
+        0.2,
+        initial_soil_moisture=store_fraction * onset,
+    )
+    assert out.water_stress_coefficient[0] == pytest.approx(k_s)

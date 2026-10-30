@@ -1,6 +1,6 @@
 # Soil Moisture Model
 
-A reduced-complexity, weekly bucket model of soil moisture, driven by air temperature, precipitation and plant biomass, with site elevation and soil clay content.
+A reduced-complexity, weekly bucket model of soil moisture, driven by air temperature, precipitation and plant biomass, with site elevation and soil texture.
 It is written in plain numpy, vectorised over space, and designed as a component of the [SatTerC](https://github.com/SatTerC/satterc) framework.
 
 > [!WARNING]
@@ -19,7 +19,7 @@ pip install git+https://github.com/SatTerC/soil-moisture-model
 ```python
 from soil_moisture_model import simulate
 
-out = simulate(temperature, precipitation, biomass, elevation=150.0, clay=25.0)
+out = simulate(temperature, precipitation, biomass, elevation=150.0, sand=0.4, clay=0.2)
 out.soil_moisture  # mm, shape (time, *space)
 ```
 

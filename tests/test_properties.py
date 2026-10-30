@@ -16,6 +16,9 @@ def test_store_within_capacity(inputs):
     assert np.all(out.soil_moisture >= 0.0)
     assert np.all(out.soil_moisture <= out.soil.soil_water_capacity)
     assert np.all((out.relative_soil_moisture >= 0) & (out.relative_soil_moisture <= 1))
+    theta = out.soil_water_content
+    assert np.all(theta >= out.soil.water_content_at_wilting_point - 1e-12)
+    assert np.all(theta <= out.soil.water_content_at_saturation + 1e-12)
 
 
 @SETTINGS
@@ -60,6 +63,15 @@ def test_evapotranspiration_bounded_by_demand_and_water(inputs):
         out.actual_evapotranspiration <= out.potential_evapotranspiration + 1e-12
     )
     assert np.all(out.actual_evapotranspiration <= supply + 1e-12)
+
+
+@SETTINGS
+@given(inputs=model_inputs())
+def test_total_evaporative_loss_bounded_by_demand(inputs):
+    out = simulate(**inputs)
+    assert np.all(
+        out.total_evaporative_loss <= out.potential_evapotranspiration + 1e-12
+    )
 
 
 @SETTINGS

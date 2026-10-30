@@ -10,8 +10,10 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from .constants import DAYS_PER_WEEK
 from .params import ModelConstants, SoilWaterParams
+
+_DAYS_PER_WEEK = 7
+"""Number of days in one model time step."""
 
 DEFAULT_CONSTANTS = ModelConstants()
 
@@ -181,7 +183,7 @@ def reference_evapotranspiration(
     """
     temp = np.asarray(temperature, dtype=float)
     coefficient = np.asarray(reference_et_coefficient, dtype=float)
-    degree_days = np.maximum(temp - constants.base_temperature, 0.0) * DAYS_PER_WEEK
+    degree_days = np.maximum(temp - constants.base_temperature, 0.0) * _DAYS_PER_WEEK
     return coefficient * degree_days * elevation_et_multiplier(elevation, constants)
 
 

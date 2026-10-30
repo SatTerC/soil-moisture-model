@@ -18,7 +18,6 @@ nav = [
         "API_Reference/model.md",
         "API_Reference/params.md",
         "API_Reference/processes.md",
-        "API_Reference/constants.md",
     ] },
 ]
 

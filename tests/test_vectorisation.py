@@ -65,8 +65,14 @@ def test_block_equals_stacked_pixels(block):
         for f in fields(SoilWaterOutput):
             if f.name == "soil":
                 continue
-            np.testing.assert_array_equal(
-                getattr(together, f.name)[:, i], getattr(alone, f.name), err_msg=f.name
+            # Not exact: numpy may round power and exp differently for a block and a
+            # single pixel, depending on the CPU.
+            np.testing.assert_allclose(
+                getattr(together, f.name)[:, i],
+                getattr(alone, f.name),
+                rtol=1e-12,
+                atol=0,
+                err_msg=f.name,
             )
         assert together.soil.soil_water_capacity[i] == alone.soil.soil_water_capacity
 

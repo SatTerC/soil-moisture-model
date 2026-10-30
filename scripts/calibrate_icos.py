@@ -120,9 +120,23 @@ def load_drivers(input_dir: Path, site: str) -> tuple[pd.DatetimeIndex, dict, fl
             "precipitation": ds["precipitation_mm"][:, 0, 0].values,
             "lai": ds["lai"][:, 0, 0].values,
         }
-        # Passed through as clay percent, as in the original script.
-        clay = float(ds.attrs["clay_fraction"])
+        clay = clay_percent(float(ds.attrs["clay_fraction"]))
     return time, drivers, clay
+
+
+def clay_percent(value: float) -> float:
+    """Return the ``clay_fraction`` attribute as clay percent, as the model takes it.
+
+    Despite its name the attribute is passed through as percent. A value of 1 or
+    less is far more likely a true fraction than a soil with under 1 % clay, and
+    would make every site look clay-free, so it is refused rather than guessed.
+    """
+    if value <= 1.0:
+        raise ValueError(
+            f"clay_fraction = {value} looks like a fraction (0-1), but the model "
+            "takes clay percent; check the input files"
+        )
+    return value
 
 
 def load_weekly_swc(fluxnet_dir: Path, site: str) -> pd.Series:

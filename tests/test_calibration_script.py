@@ -99,3 +99,13 @@ def test_calibrates_and_resumes(calibrate, tmp_path, capsys):
     calibrate.main(argv)  # second run skips the calibrated site and adds no rows
     assert "Skipping BE-Xxx" in capsys.readouterr().out
     assert len(pd.read_parquet(tmp_path / "results_all_sites.parquet")) == N_WEEKS
+
+
+@pytest.mark.parametrize("value", [0.0, 0.25, 1.0])
+def test_clay_fraction_refused(calibrate, value):
+    with pytest.raises(ValueError, match="looks like a fraction"):
+        calibrate.clay_percent(value)
+
+
+def test_clay_percent_passed_through(calibrate):
+    assert calibrate.clay_percent(25.0) == 25.0

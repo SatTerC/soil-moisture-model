@@ -1,54 +1,33 @@
-"""Run the current model on a regression scenario, returning legacy-named outputs.
+"""Run the current model on a regression scenario.
 
-This is the only place that knows the current public API. When the API changes,
-update this adapter, not the fixtures.
+This is the only place that knows the current public API. When the API changes
+without changing the numbers, update this adapter, not the fixtures.
 """
+
+from dataclasses import fields
 
 import numpy as np
 
-from soil_moisture_model import SoilWaterParams, simulate
-
-# legacy SoilWaterParams field -> current SoilWaterParams field
-PARAM_NAMES = {
-    "base_soil_water_capacity_mm": "nominal_soil_water_capacity",
-    "base_drainage_coeff": "drainage_coefficient",
-    "base_runoff_fraction_max": "max_runoff_fraction",
-    "runoff_exponent": "runoff_exponent",
-    "field_capacity_fraction": "field_capacity_fraction",
-    "reference_clay_pct": "nominal_clay",
-    "clay_sensitivity": "clay_sensitivity",
-    "pet_coeff_mm_per_degday": "reference_et_coefficient",
-    "biomass_half_sat_gC_m2": "biomass_half_saturation",
-}
+from soil_moisture_model import SoilProperties, SoilWaterParams, simulate
 
 
 def run_scenario(inputs: dict) -> dict[str, np.ndarray]:
-    legacy_params = dict(inputs["params"])
-    initial = legacy_params.pop("initial_soil_moisture_mm", 50.0)
-    params = SoilWaterParams(**{PARAM_NAMES[k]: v for k, v in legacy_params.items()})
+    """Return every output of a scenario run, soil properties as ``soil.<field>``."""
+    params = dict(inputs["params"])
+    initial = params.pop("initial_soil_moisture", None)
     out = simulate(
         inputs["temp_c"],
         inputs["precip_mm"],
         inputs["biomass_gC_m2"],
         float(inputs["elevation_m"]),
-        float(inputs["clay_pct"]),
+        float(inputs["sand"]),
+        float(inputs["clay"]),
         initial_soil_moisture=initial,
-        params=params,
+        params=SoilWaterParams(**params),
     )
-    return {
-        "base_pet_mm": out.reference_evapotranspiration,
-        "kc": out.crop_coefficient,
-        "interception_capacity_mm": out.interception_capacity,
-        "intercepted_mm": out.interception,
-        "throughfall_mm": out.throughfall,
-        "frozen_soil": out.frozen,
-        "et_potential_mm": out.potential_evapotranspiration,
-        "water_stress": out.water_stress_coefficient,
-        "et_actual_mm": out.actual_evapotranspiration,
-        "total_evaporative_loss_mm": out.total_evaporative_loss,
-        "runoff_mm": out.runoff,
-        "drainage_mm": out.drainage,
-        "soil_moisture_mm": out.soil_moisture,
-        "relative_soil_moisture": out.relative_soil_moisture,
-        "soil_water_capacity_mm": out.soil.soil_water_capacity,
-    }
+    result = {f.name: getattr(out, f.name) for f in fields(out) if f.name != "soil"}
+    result["total_evaporative_loss"] = out.total_evaporative_loss
+    result.update(
+        {f"soil.{f.name}": getattr(out.soil, f.name) for f in fields(SoilProperties)}
+    )
+    return result

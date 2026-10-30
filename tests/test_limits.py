@@ -11,7 +11,7 @@ N = 104
 def test_no_rain_store_never_rises():
     t = 15.0 + 10.0 * np.sin(np.arange(N) / 8.0)
     out = simulate(
-        t, np.zeros(N), np.full(N, 300.0), 0.0, 25.0, initial_soil_moisture=150.0
+        t, np.zeros(N), np.full(N, 300.0), 0.0, 0.4, 0.2, initial_soil_moisture=150.0
     )
     assert np.all(np.diff(out.soil_moisture) <= 0.0)
     assert out.soil_moisture[-1] < 150.0
@@ -24,25 +24,26 @@ def test_no_rain_no_demand_below_field_capacity_store_constant():
         np.zeros(N),
         np.zeros(N),
         0.0,
-        25.0,
+        0.4,
+        0.2,
         initial_soil_moisture=50.0,
     )
     np.testing.assert_array_equal(out.soil_moisture, 50.0)
 
 
 def test_initial_store_clipped_to_capacity():
-    out = simulate([-1.0], [0.0], [0.0], 0.0, 25.0, initial_soil_moisture=1e6)
+    out = simulate([-1.0], [0.0], [0.0], 0.0, 0.4, 0.2, initial_soil_moisture=1e6)
     assert out.soil_moisture[0] <= out.soil.soil_water_capacity
 
 
 @pytest.mark.parametrize(
     "bad",
     [
-        {"nominal_soil_water_capacity": 0.0},
+        {"rooting_depth": 0.0},
+        {"depletion_fraction": 1.0},
         {"drainage_coefficient": 1.5},
         {"max_runoff_fraction": -0.1},
         {"runoff_exponent": 0.0},
-        {"field_capacity_fraction": 1.2},
         {"biomass_half_saturation": 0.0},
         {"biomass_half_saturation": np.array([100.0, -1.0])},
     ],

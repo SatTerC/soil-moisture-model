@@ -44,7 +44,7 @@ def write_site(root: Path, site: str, *, with_swc: bool) -> None:
             "lai": (("time", "lat", "lon"), cube(2 + np.sin(2 * np.pi * week / 52))),
         },
         coords={"time": time, "lat": [50.0], "lon": [5.0]},
-        attrs={"clay_fraction": 25.0},
+        attrs={"sand_fraction": 0.4, "clay_fraction": 0.2},
     )
     (root / "inputs").mkdir(exist_ok=True)
     ds.to_netcdf(root / "inputs" / f"{site}_weekly_final_variables.nc")
@@ -101,11 +101,12 @@ def test_calibrates_and_resumes(calibrate, tmp_path, capsys):
     assert len(pd.read_parquet(tmp_path / "results_all_sites.parquet")) == N_WEEKS
 
 
+@pytest.mark.parametrize("value", [-0.1, 1.5, 25.0])
+def test_texture_outside_unit_interval_refused(calibrate, value):
+    with pytest.raises(ValueError, match="not a fraction"):
+        calibrate.texture_fraction("clay_fraction", value)
+
+
 @pytest.mark.parametrize("value", [0.0, 0.25, 1.0])
-def test_clay_fraction_refused(calibrate, value):
-    with pytest.raises(ValueError, match="looks like a fraction"):
-        calibrate.clay_percent(value)
-
-
-def test_clay_percent_passed_through(calibrate):
-    assert calibrate.clay_percent(25.0) == 25.0
+def test_texture_fraction_passed_through(calibrate, value):
+    assert calibrate.texture_fraction("clay_fraction", value) == value

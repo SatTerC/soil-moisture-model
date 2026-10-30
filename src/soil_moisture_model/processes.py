@@ -141,7 +141,7 @@ def saturation_vapour_pressure_slope(temperature: ArrayLike) -> NDArray:
     r"""Return the slope of the saturation vapour pressure curve, `[FAO56]` eq. (13).
 
     $$
-    s = \frac{4098 \times 0.6108 \exp\left(\frac{17.27\, T}{T + 237.3}\right)}
+    \Delta = \frac{4098 \times 0.6108 \exp\left(\frac{17.27\, T}{T + 237.3}\right)}
              {(T + 237.3)^2}
     $$
 
@@ -153,7 +153,7 @@ def saturation_vapour_pressure_slope(temperature: ArrayLike) -> NDArray:
     Returns
     -------
     NDArray
-        Slope of the saturation vapour pressure curve, $s$ (kPa per degC).
+        Slope of the saturation vapour pressure curve, $\Delta$ (kPa per degC).
     """
     temp = np.asarray(temperature, dtype=float)
     return 4098.0 * 0.6108 * np.exp(17.27 * temp / (temp + 237.3)) / (temp + 237.3) ** 2
@@ -162,11 +162,11 @@ def saturation_vapour_pressure_slope(temperature: ArrayLike) -> NDArray:
 def elevation_et_multiplier(elevation: ArrayLike, temperature: ArrayLike) -> NDArray:
     r"""Return the multiplier on reference evapotranspiration due to elevation.
 
-    The multiplier is the equilibrium evaporation factor $s / (s +
+    The multiplier is the equilibrium evaporation factor $\Delta / (\Delta +
     \gamma_{\mathrm{psy}})$ at the site, relative to its value at sea level:
 
     $$
-    m_z = \frac{s + \gamma_{\mathrm{psy}}(0)}{s + \gamma_{\mathrm{psy}}(z)}
+    m_z = \frac{\Delta + \gamma_{\mathrm{psy}}(0)}{\Delta + \gamma_{\mathrm{psy}}(z)}
     $$
 
     Lower pressure at altitude lowers the psychrometric constant, so at a given
@@ -229,61 +229,208 @@ def reference_evapotranspiration(
     return coefficient * degree_days * elevation_et_multiplier(elevation, temp)
 
 
-@dataclass(frozen=True)
-class SoilProperties:
-    """Soil hydraulic properties after adjustment for clay content.
-
-    Each field has the broadcast shape of the clay content and the parameters.
-    """
-
-    soil_water_capacity: NDArray[np.float64]
-    r"""Soil water capacity, $S_{\max}$ (mm)."""
-
-
-def soil_properties(
-    clay: ArrayLike,
-    params: SoilWaterParams,
-    constants: ModelConstants = DEFAULT_CONSTANTS,
-) -> SoilProperties:
-    r"""Adjust the nominal soil properties for clay content.
-
-    With clay content $C$ clipped to `clay_bounds` and
+def water_content_at_wilting_point(
+    sand: ArrayLike, clay: ArrayLike, organic_matter: ArrayLike
+) -> NDArray:
+    r"""Return the volumetric water content at 1500 kPa, `[SR06]` eq. (1).
 
     $$
-    \Delta = \kappa \, \frac{C - C^{\circ}}{100},
+    \begin{aligned}
+    \theta_{WP}^{t} &= -0.024 f_{\mathrm{sand}} + 0.487 f_{\mathrm{clay}}
+        + 0.006 M + 0.005 f_{\mathrm{sand}} M
+        - 0.013 f_{\mathrm{clay}} M + 0.068 f_{\mathrm{sand}} f_{\mathrm{clay}}
+        + 0.031 \\
+    \theta_{WP} &= \theta_{WP}^{t} + 0.14\, \theta_{WP}^{t} - 0.02
+    \end{aligned}
     $$
 
-    the soil water capacity is scaled linearly in $\Delta$ and then clipped to its
-    bounds:
-
-    $$
-    S_{\max} = S_{\max}^{\circ}\,(1 + \Delta)
-    $$
-
-    So more clay means more storage.
+    with organic matter $M$ in percent by weight, as `[SR06]` fits it.
 
     Parameters
     ----------
+    sand
+        Sand fraction by weight, $f_{\mathrm{sand}}$ (dimensionless).
     clay
-        Soil clay content, $C$ (percent).
+        Clay fraction by weight, $f_{\mathrm{clay}}$ (dimensionless).
+    organic_matter
+        Organic matter fraction by weight, $f_{\mathrm{om}}$ (dimensionless);
+        $M = 100\, f_{\mathrm{om}}$.
+
+    Returns
+    -------
+    NDArray
+        Water content at wilting point, $\theta_{WP}$ (m3 per m3).
+    """
+    f_sand, f_clay = np.asarray(sand, dtype=float), np.asarray(clay, dtype=float)
+    om = 100.0 * np.asarray(organic_matter, dtype=float)
+    first = (
+        -0.024 * f_sand
+        + 0.487 * f_clay
+        + 0.006 * om
+        + 0.005 * f_sand * om
+        - 0.013 * f_clay * om
+        + 0.068 * f_sand * f_clay
+        + 0.031
+    )
+    return first + 0.14 * first - 0.02
+
+
+def water_content_at_field_capacity(
+    sand: ArrayLike, clay: ArrayLike, organic_matter: ArrayLike
+) -> NDArray:
+    r"""Return the volumetric water content at 33 kPa, `[SR06]` eq. (2).
+
+    $$
+    \begin{aligned}
+    \theta_{FC}^{t} &= -0.251 f_{\mathrm{sand}} + 0.195 f_{\mathrm{clay}}
+        + 0.011 M + 0.006 f_{\mathrm{sand}} M
+        - 0.027 f_{\mathrm{clay}} M + 0.452 f_{\mathrm{sand}} f_{\mathrm{clay}}
+        + 0.299 \\
+    \theta_{FC} &= \theta_{FC}^{t} + 1.283 (\theta_{FC}^{t})^2
+        - 0.374\, \theta_{FC}^{t} - 0.015
+    \end{aligned}
+    $$
+
+    Parameters
+    ----------
+    sand, clay, organic_matter
+        Sand, clay and organic matter fractions by weight; see
+        `water_content_at_wilting_point`.
+
+    Returns
+    -------
+    NDArray
+        Water content at field capacity, $\theta_{FC}$ (m3 per m3).
+    """
+    f_sand, f_clay = np.asarray(sand, dtype=float), np.asarray(clay, dtype=float)
+    om = 100.0 * np.asarray(organic_matter, dtype=float)
+    first = (
+        -0.251 * f_sand
+        + 0.195 * f_clay
+        + 0.011 * om
+        + 0.006 * f_sand * om
+        - 0.027 * f_clay * om
+        + 0.452 * f_sand * f_clay
+        + 0.299
+    )
+    return first + 1.283 * first**2 - 0.374 * first - 0.015
+
+
+def water_content_at_saturation(
+    sand: ArrayLike, clay: ArrayLike, organic_matter: ArrayLike
+) -> NDArray:
+    r"""Return the volumetric water content at saturation, `[SR06]` eqs. (3), (5).
+
+    $$
+    \begin{aligned}
+    \theta_{S-33}^{t} &= 0.278 f_{\mathrm{sand}} + 0.034 f_{\mathrm{clay}}
+        + 0.022 M - 0.018 f_{\mathrm{sand}} M
+        - 0.027 f_{\mathrm{clay}} M - 0.584 f_{\mathrm{sand}} f_{\mathrm{clay}}
+        + 0.078 \\
+    \theta_{S-33} &= \theta_{S-33}^{t} + 0.636\, \theta_{S-33}^{t} - 0.107 \\
+    \theta_{sat} &= \theta_{FC} + \theta_{S-33}
+        - 0.097 f_{\mathrm{sand}} + 0.043
+    \end{aligned}
+    $$
+
+    This is the normal-density value; `[SR06]`'s adjustment for bulk density is
+    not applied.
+
+    Parameters
+    ----------
+    sand, clay, organic_matter
+        Sand, clay and organic matter fractions by weight; see
+        `water_content_at_wilting_point`.
+
+    Returns
+    -------
+    NDArray
+        Water content at saturation, $\theta_{sat}$ (m3 per m3).
+    """
+    f_sand, f_clay = np.asarray(sand, dtype=float), np.asarray(clay, dtype=float)
+    om = 100.0 * np.asarray(organic_matter, dtype=float)
+    first = (
+        0.278 * f_sand
+        + 0.034 * f_clay
+        + 0.022 * om
+        - 0.018 * f_sand * om
+        - 0.027 * f_clay * om
+        - 0.584 * f_sand * f_clay
+        + 0.078
+    )
+    above_field_capacity = first + 0.636 * first - 0.107
+    theta_fc = water_content_at_field_capacity(sand, clay, organic_matter)
+    return theta_fc + above_field_capacity - 0.097 * f_sand + 0.043
+
+
+@dataclass(frozen=True)
+class SoilProperties:
+    """Soil hydraulic properties from texture and rooting depth.
+
+    Each field has the broadcast shape of the texture and the parameters. The
+    stores count water above the wilting point, over the rooting depth.
+    """
+
+    water_content_at_wilting_point: NDArray[np.float64]
+    r"""Volumetric water content at wilting point, $\theta_{WP}$ (m3 per m3)."""
+    water_content_at_field_capacity: NDArray[np.float64]
+    r"""Volumetric water content at field capacity, $\theta_{FC}$ (m3 per m3)."""
+    water_content_at_saturation: NDArray[np.float64]
+    r"""Volumetric water content at saturation, $\theta_{sat}$ (m3 per m3)."""
+    field_capacity: NDArray[np.float64]
+    r"""Field capacity, $S_{fc} = 1000 (\theta_{FC} - \theta_{WP}) Z_r$ (mm);
+    `[FAO56]`'s total available water, eq. (82)."""
+    soil_water_capacity: NDArray[np.float64]
+    r"""Soil water capacity, $S_{\max} = 1000 (\theta_{sat} - \theta_{WP}) Z_r$
+    (mm)."""
+
+
+def soil_properties(
+    sand: ArrayLike,
+    clay: ArrayLike,
+    organic_matter: ArrayLike,
+    params: SoilWaterParams,
+) -> SoilProperties:
+    r"""Return the soil hydraulic properties from texture and rooting depth.
+
+    The water contents come from the `[SR06]` pedotransfer functions; the stores
+    count water above the wilting point over the rooting depth $Z_r$:
+
+    $$
+    S_{fc} = 1000 (\theta_{FC} - \theta_{WP}) Z_r, \qquad
+    S_{\max} = 1000 (\theta_{sat} - \theta_{WP}) Z_r
+    $$
+
+    Where the pedotransfer functions do not give $0 < \theta_{WP} < \theta_{FC} <
+    \theta_{sat} \le 1$, which happens only for implausible texture, every
+    property is NaN, so the pixel's outputs are NaN.
+
+    Parameters
+    ----------
+    sand, clay, organic_matter
+        Sand, clay and organic matter fractions by weight; see
+        `water_content_at_wilting_point`.
     params
-        Supplies `nominal_soil_water_capacity` ($S_{\max}^{\circ}$),
-        `nominal_clay` ($C^{\circ}$) and `clay_sensitivity` ($\kappa$).
-    constants
-        Supplies the clip bounds.
+        Supplies `rooting_depth`, $Z_r$.
 
     Returns
     -------
     SoilProperties
-        The clay-adjusted properties.
+        The soil hydraulic properties.
     """
-    c = constants
-    clay_clipped = np.clip(np.asarray(clay, dtype=float), *c.clay_bounds)
-    delta = params.clay_sensitivity * (clay_clipped - params.nominal_clay) / 100.0
-
+    theta_wp = water_content_at_wilting_point(sand, clay, organic_matter)
+    theta_fc = water_content_at_field_capacity(sand, clay, organic_matter)
+    theta_sat = water_content_at_saturation(sand, clay, organic_matter)
+    ordered = (theta_wp > 0.0) & (theta_wp < theta_fc) & (theta_fc < theta_sat)
+    ordered &= theta_sat <= 1.0
+    theta_wp, theta_fc, theta_sat = (
+        np.where(ordered, x, np.nan) for x in (theta_wp, theta_fc, theta_sat)
+    )
+    depth_mm = 1000.0 * np.asarray(params.rooting_depth, dtype=float)
     return SoilProperties(
-        soil_water_capacity=np.clip(
-            params.nominal_soil_water_capacity * (1.0 + delta),
-            *c.soil_water_capacity_bounds,
-        ),
+        water_content_at_wilting_point=theta_wp,
+        water_content_at_field_capacity=theta_fc,
+        water_content_at_saturation=theta_sat,
+        field_capacity=(theta_fc - theta_wp) * depth_mm,
+        soil_water_capacity=(theta_sat - theta_wp) * depth_mm,
     )

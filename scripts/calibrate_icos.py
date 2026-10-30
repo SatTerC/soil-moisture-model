@@ -28,7 +28,8 @@ Inputs
   ``Elevation above sea`` and, optionally, ``plant_type``.
 - ``--input-dir``: weekly drivers, one ``<site>_weekly_final_variables.nc`` per
   site, with variables ``temperature_celcius``, ``precipitation_mm`` and ``lai``
-  on ``(time, lat, lon)`` and a global attribute ``clay_fraction``.
+  on ``(time, lat, lon)`` and global attributes ``sand_fraction`` and
+  ``clay_fraction``, as fractions by weight.
 - ``--fluxnet-dir``: half-hourly FLUXNET files at
   ``tmp_<site>/ICOSETC_<site>_FLUXNET_HH_L2.csv``.
 
@@ -72,13 +73,12 @@ SITE_TYPES = (
 # store; the rest are SoilWaterParams fields.
 PARAM_BOUNDS: dict[str, tuple[float, float]] = {
     "initial_soil_moisture": (5.0, 250.0),
-    "nominal_soil_water_capacity": (60.0, 400.0),
     "drainage_coefficient": (0.01, 0.30),
     "max_runoff_fraction": (0.02, 0.95),
     "runoff_exponent": (0.5, 4.0),
-    "field_capacity_fraction": (0.40, 0.95),
-    "nominal_clay": (5.0, 60.0),
-    "clay_sensitivity": (0.0, 0.10),
+    # [FAO56] limits the adjusted depletion fraction to 0.1-0.8.
+    "rooting_depth": (0.2, 3.0),
+    "depletion_fraction": (0.1, 0.8),
     "reference_et_coefficient": (0.05, 0.5),
     "biomass_half_saturation": (20.0, 800.0),
 }
@@ -111,8 +111,10 @@ def load_stations(path: Path) -> pd.DataFrame:
     return stations.dropna(subset=["Id"]).drop_duplicates(subset="Id")
 
 
-def load_drivers(input_dir: Path, site: str) -> tuple[pd.DatetimeIndex, dict, float]:
-    """Return the weekly time index, driver arrays and clay content of a site."""
+def load_drivers(
+    input_dir: Path, site: str
+) -> tuple[pd.DatetimeIndex, dict, tuple[float, float]]:
+    """Return the weekly time index, driver arrays and (sand, clay) of a site."""
     with xr.open_dataset(input_dir / f"{site}_weekly_final_variables.nc") as ds:
         time = pd.DatetimeIndex(ds["time"].values)
         drivers = {
@@ -120,21 +122,24 @@ def load_drivers(input_dir: Path, site: str) -> tuple[pd.DatetimeIndex, dict, fl
             "precipitation": ds["precipitation_mm"][:, 0, 0].values,
             "lai": ds["lai"][:, 0, 0].values,
         }
-        clay = clay_percent(float(ds.attrs["clay_fraction"]))
-    return time, drivers, clay
+        sand, clay = (
+            texture_fraction(name, float(ds.attrs[name]))
+            for name in ("sand_fraction", "clay_fraction")
+        )
+    return time, drivers, (sand, clay)
 
 
-def clay_percent(value: float) -> float:
-    """Return the ``clay_fraction`` attribute as clay percent, as the model takes it.
+def texture_fraction(name: str, value: float) -> float:
+    """Return a texture attribute, refusing values that cannot be a fraction.
 
-    Despite its name the attribute is passed through as percent. A value of 1 or
-    less is far more likely a true fraction than a soil with under 1 % clay, and
-    would make every site look clay-free, so it is refused rather than guessed.
+    The model takes fractions by weight. A value above 1 is most likely percent,
+    which would give implausible water contents, so it is refused rather than
+    rescaled.
     """
-    if value <= 1.0:
+    if not 0.0 <= value <= 1.0:
         raise ValueError(
-            f"clay_fraction = {value} looks like a fraction (0-1), but the model "
-            "takes clay percent; check the input files"
+            f"{name} = {value} is not a fraction in [0, 1]; percent? "
+            "check the input files"
         )
     return value
 
@@ -149,7 +154,9 @@ def load_weekly_swc(fluxnet_dir: Path, site: str) -> pd.Series:
     return swc.groupby(week_end.to_numpy()).mean()
 
 
-def run(drivers: dict, elevation: float, clay: float, x) -> SoilWaterOutput:
+def run(
+    drivers: dict, elevation: float, texture: tuple[float, float], x
+) -> SoilWaterOutput:
     """Run the model for one site from an optimiser vector."""
     params, initial, lai_to_biomass = unpack(x)
     return simulate(
@@ -157,7 +164,7 @@ def run(drivers: dict, elevation: float, clay: float, x) -> SoilWaterOutput:
         drivers["precipitation"],
         drivers["lai"] * lai_to_biomass,
         elevation,
-        clay,
+        *texture,
         initial_soil_moisture=initial,
         params=params,
     )
@@ -168,7 +175,7 @@ def make_objective(
     drivers: dict,
     swc: pd.Series,
     elevation: float,
-    clay: float,
+    texture: tuple[float, float],
 ) -> Callable[[np.ndarray], float]:
     """Return the RMSE objective between simulated soil moisture and SWC.
 
@@ -180,7 +187,7 @@ def make_objective(
     obs = obs[matched]
 
     def objective(x: np.ndarray) -> float:
-        sim = run(drivers, elevation, clay, x).soil_moisture[matched]
+        sim = run(drivers, elevation, texture, x).soil_moisture[matched]
         ok = np.isfinite(sim)
         if ok.sum() < MIN_MATCHED_WEEKS:
             return np.inf
@@ -204,7 +211,7 @@ def calibrate_site(
     maxiter: int,
 ) -> tuple[pd.DataFrame, dict]:
     """Calibrate one site; return its best-fit simulation and parameter record."""
-    time, drivers, clay = load_drivers(input_dir, site)
+    time, drivers, texture = load_drivers(input_dir, site)
     swc = load_weekly_swc(fluxnet_dir, site)
     elevation = float(meta["Elevation above sea"])
     plant_type = meta.get("plant_type", np.nan)
@@ -213,13 +220,13 @@ def calibrate_site(
         str(plant_type).strip().lower(), DEFAULT_LAI_TO_BIOMASS_BOUNDS
     )
     bounds = [*PARAM_BOUNDS.values(), lai_bounds]
-    objective = make_objective(time, drivers, swc, elevation, clay)
+    objective = make_objective(time, drivers, swc, elevation, texture)
     opt = dual_annealing(objective, bounds=bounds, maxiter=maxiter, seed=42)
     if not np.isfinite(opt.fun):
         raise RuntimeError(f"fewer than {MIN_MATCHED_WEEKS} weeks of matched SWC")
 
     params, initial, lai_to_biomass = unpack(opt.x)
-    results = to_frame(run(drivers, elevation, clay, opt.x), time)
+    results = to_frame(run(drivers, elevation, texture, opt.x), time)
     results["SWC_F_MDS_1"] = swc.reindex(time).to_numpy()
     results["site_name"] = site
     results["plant_type"] = plant_type

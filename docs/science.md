@@ -5,14 +5,14 @@ icon: lucide/microscope
 
 # Scientific background
 
-The model is a single-layer "bucket": one soil water store holding the soil moisture $S$ (mm), with soil water capacity $S_{\max}$, stepped forward one week at a time.
+The model is a single-layer "bucket": one soil water store holding the soil moisture $S$ (mm), the water above the wilting point over the rooting depth, with soil water capacity $S_{\max}$, stepped forward one week at a time.
 It aims to reproduce the main ecohydrological controls on soil moisture with as few parameters as possible, so that it can be calibrated at individual sites and run cheaply over large grids.
 It is not a process-detailed hydrological model.
 Symbols and terms follow [Notation](notation.md).
 
 Three things set the store's behaviour:
 
-- **Soil texture.** Clay content changes the soil water capacity.
+- **Soil and roots.** Sand, clay and organic matter set the water contents at wilting point, field capacity and saturation; the rooting depth sets how much of the soil profile the store covers.
 - **Vegetation.** Plant biomass controls canopy interception and the crop coefficient.
 - **Climate.** Temperature drives evaporative demand and decides whether a week is frozen; precipitation supplies water.
 
@@ -73,13 +73,13 @@ Reference evapotranspiration comes from a degree-day relation, scaled by an elev
 $$
 ET_o = c_{ET} \cdot 7 \max(T - T_b,\ 0) \cdot m_z,
 \qquad
-m_z = \frac{s + \gamma_{\mathrm{psy}}(0)}{s + \gamma_{\mathrm{psy}}(z)}
+m_z = \frac{\Delta + \gamma_{\mathrm{psy}}(0)}{\Delta + \gamma_{\mathrm{psy}}(z)}
 $$
 
 where $T$ is weekly mean air temperature (°C), $T_b$ the base temperature, $c_{ET}$ the calibrated reference ET coefficient (mm °C⁻¹ day⁻¹), $z$ the elevation (m) and $m_z$ the elevation multiplier.
 
-The elevation multiplier is the equilibrium evaporation factor $s / (s + \gamma_{\mathrm{psy}})$ at the site, relative to sea level.
-Here $s$ is the slope of the saturation vapour pressure curve at $T$, `[FAO56]` eq. (13), and $\gamma_{\mathrm{psy}}(z)$ the psychrometric constant, `[FAO56]` eq. (8), at the atmospheric pressure of elevation $z$, `[FAO56]` eq. (7).
+The elevation multiplier is the equilibrium evaporation factor $\Delta / (\Delta + \gamma_{\mathrm{psy}})$ at the site, relative to sea level.
+Here $\Delta$ is the slope of the saturation vapour pressure curve at $T$, `[FAO56]` eq. (13), and $\gamma_{\mathrm{psy}}(z)$ the psychrometric constant, `[FAO56]` eq. (8), at the atmospheric pressure of elevation $z$, `[FAO56]` eq. (7).
 Lower pressure at altitude lowers $\gamma_{\mathrm{psy}}$, so at a given temperature demand rises with elevation, by about 4 % per kilometre at 20 °C.
 The multiplier has no free parameters.
 
@@ -104,7 +104,7 @@ K_s = \min\left(1,\ \frac{S^{+}_t}{(1 - p)\, S_{fc}}\right),
 ET_a = \min\left(K_s\, (ET_p - I),\ S^{+}_t\right)
 $$
 
-This is `[FAO56]` eq. (84), with the field capacity $S_{fc}$ (see [Drainage](#drainage)) as the total available water.
+This is `[FAO56]` eq. (84), with the field capacity $S_{fc}$ (see [Soil texture and rooting depth](#soil-texture-and-rooting-depth)) as the total available water.
 Evapotranspiration is unstressed until a fraction $p$, the depletion fraction, of the water held at field capacity has been used, and then falls linearly to zero as the store empties.
 `[FAO56]` Table 22 gives $p$ between 0.3 and 0.7 by crop; the default is 0.5, which `[FAO56]` says is commonly used for many crops.
 
@@ -113,12 +113,11 @@ Evapotranspiration is unstressed until a fraction $p$, the depletion fraction, o
 A fixed fraction $k_d^{\mathrm{eff}}$ of the water above field capacity drains each week:
 
 $$
-D = k_d^{\mathrm{eff}} \max\left(S^{+}_t - ET_a - S_{fc},\ 0\right),
-\qquad
-S_{fc} = \phi_{fc} S_{\max}
+D = k_d^{\mathrm{eff}} \max\left(S^{+}_t - ET_a - S_{fc},\ 0\right)
 $$
 
-where $k_d$ is the drainage coefficient and $\phi_{fc}$ the field-capacity fraction, the field capacity $S_{fc}$ as a fraction of $S_{\max}$.
+where $k_d$ is the drainage coefficient and $S_{fc}$ the field capacity.
+Water between field capacity and saturation therefore stays in the store for some weeks, where `[FAO56]` would drain it within the day.
 
 ## Biomass effects
 
@@ -136,24 +135,26 @@ K_c = K_{c,\min} + (K_{c,\max} - K_{c,\min}) f_B,
 \text{interception capacity} = f_B\,I_{\max}
 $$
 
-## Clay effects
+## Soil texture and rooting depth
 
-The soil water capacity is calibrated as a nominal value $S_{\max}^{\circ}$, for a soil with the nominal clay content $C^{\circ}$.
-For clay content $C$ (percent, clipped to between 0 and 80), let
-
-$$
-\Delta = \kappa \frac{C - C^{\circ}}{100}
-$$
-
-with clay sensitivity $\kappa$.
-The soil water capacity is scaled linearly in the clay offset $\Delta$, then clipped to a plausible range:
+The store is the water above the wilting point within the rooting depth $Z_r$ (m).
+Its field capacity and capacity follow from three volumetric water contents (m³ m⁻³):
 
 $$
-S_{\max} = S_{\max}^{\circ}\,(1 + \Delta)
+S_{fc} = 1000\,(\theta_{FC} - \theta_{WP})\,Z_r,
+\qquad
+S_{\max} = 1000\,(\theta_{sat} - \theta_{WP})\,Z_r
 $$
 
-More clay therefore means more storage.
-The drainage coefficient $k_d$ and maximum runoff fraction $r_{\max}$ are calibrated directly and do not depend on clay.
+$S_{fc}$ is `[FAO56]`'s total available water, eq. (82).
+The water contents at wilting point (1500 kPa), field capacity (33 kPa) and saturation come from the `[SR06]` pedotransfer functions, eqs. (1), (2), (3) and (5), in the sand, clay and organic matter fractions.
+`[SR06]`'s adjustment for bulk density is not applied.
+Where the functions do not give $0 < \theta_{WP} < \theta_{FC} < \theta_{sat} \le 1$, which happens only for implausible texture such as pure sand or very high organic matter, the pixel's outputs are NaN.
+
+The soil water content over the rooting depth, $\theta = \theta_{WP} + S / (1000\,Z_r)$, is an output, for comparison with observations and for models such as sgam that take volumetric water content.
+
+The rooting depth $Z_r$ and the depletion fraction $p$ are properties of the vegetation, which `[FAO56]` Table 22 lists by crop.
+Both are fields of `SoilWaterParams`, so they can vary per pixel, for example by plant functional type.
 
 ## Frozen weeks
 
@@ -173,9 +174,9 @@ This is a threshold on weekly air temperature, not a frozen-soil state: there is
 
 ## Parameters and constants
 
-The nine calibrated parameters are fields of [`SoilWaterParams`](API_Reference/params.md#soil_moisture_model.params.SoilWaterParams).
+The seven calibrated parameters are fields of [`SoilWaterParams`](API_Reference/params.md#soil_moisture_model.params.SoilWaterParams).
 Every other number in the equations above is a field of [`ModelConstants`](API_Reference/params.md#soil_moisture_model.params.ModelConstants), with its default value, so sensitivity studies can vary them without editing the code.
-The initial soil moisture $S_0$ is an argument of [`simulate`](API_Reference/model.md#soil_moisture_model.model.simulate) rather than a parameter.
+The initial soil moisture $S_0$ is an argument of [`simulate`](API_Reference/model.md#soil_moisture_model.model.simulate) rather than a parameter, and defaults to field capacity.
 
 ### Calibrated parameters
 
@@ -211,5 +212,5 @@ The initial soil moisture $S_0$ is an argument of [`simulate`](API_Reference/mod
 
 - The built-in evaporative demand depends on temperature only: there is no radiation, humidity or wind, unless $ET_o$ is supplied.
 - Freezing is diagnosed from air temperature alone; there is no snowpack.
-- The single store has no vertical structure, so it cannot represent a wet surface over a dry subsoil.
+- The single store has no vertical structure, so it cannot represent a wet surface over a dry subsoil, and texture is a single value over the rooting depth.
 - The time step is fixed at one week.

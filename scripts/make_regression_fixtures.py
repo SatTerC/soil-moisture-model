@@ -3,7 +3,6 @@
 # dependencies = [
 #     "soil_moisture_model",
 #     "numpy>=2.4.2",
-#     "pandas>=2.2",
 # ]
 #
 # [tool.uv.sources]
@@ -13,25 +12,22 @@
 
 The fixtures pin the numerical behaviour of the model on a handful of synthetic
 scenarios, each chosen to exercise a branch of the model that the others do not.
+They are generated from the working tree, recording the subject of the commit
+that changed the model's behaviour.
 
-By default the outputs come from the *legacy* model, loaded from the git commit
-``LEGACY_REF`` rather than from the working tree, so the fixtures can always be
-regenerated from a fixed reference. Once a deliberate change to the model's
-behaviour lands, regenerate them from the working tree with ``--fixed-by``.
+The first fixtures came from the original model at commit ``9d5b8fe``; once the
+model's inputs and parameters diverged from it, that path was removed, and
+``git log`` of this directory holds the history.
 
 Usage
 -----
-    uv run scripts/make_regression_fixtures.py
-    uv run scripts/make_regression_fixtures.py --check
     uv run scripts/make_regression_fixtures.py --fixed-by "<commit subject>"
+    uv run scripts/make_regression_fixtures.py --check
 """
 
 import argparse
-import importlib.util
 import json
-import subprocess
 import sys
-import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -40,59 +36,29 @@ import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "regression"
-LEGACY_REF = "9d5b8fe"
-LEGACY_PATH = "src/soil_moisture_model/main.py"
 N_WEEKS = 520
 
-# Legacy output columns that vary in time, plus the per-site soil properties.
-TIME_SERIES_OUTPUTS = (
-    "base_pet_mm",
-    "kc",
-    "biomass_uptake_factor",
-    "interception_capacity_mm",
-    "intercepted_mm",
-    "throughfall_mm",
-    "frozen_soil",
-    "et_potential_mm",
-    "water_stress",
-    "et_actual_mm",
-    "total_evaporative_loss_mm",
-    "runoff_mm",
-    "drainage_mm",
-    "soil_moisture_mm",
-    "relative_soil_moisture",
-)
-SITE_OUTPUTS = (
-    "soil_water_capacity_mm",
-    "drainage_coeff",
-    "runoff_fraction_max",
-    "stress_exponent",
-)
-
-# Parameter-space corners, taken from the calibration bounds.
+# Parameter-space corners, taken from the calibration bounds. The initial soil
+# moisture (mm) is not a parameter, but is varied with them.
 PARAMS_HIGH = {
-    "initial_soil_moisture_mm": 250.0,
-    "base_soil_water_capacity_mm": 400.0,
-    "base_drainage_coeff": 0.30,
-    "base_runoff_fraction_max": 0.95,
+    "initial_soil_moisture": 250.0,
+    "drainage_coefficient": 0.30,
+    "max_runoff_fraction": 0.95,
     "runoff_exponent": 4.0,
-    "field_capacity_fraction": 0.95,
-    "reference_clay_pct": 5.0,
-    "clay_sensitivity": 0.10,
-    "pet_coeff_mm_per_degday": 0.5,
-    "biomass_half_sat_gC_m2": 800.0,
+    "rooting_depth": 3.0,
+    "depletion_fraction": 0.8,
+    "reference_et_coefficient": 0.5,
+    "biomass_half_saturation": 800.0,
 }
 PARAMS_LOW = {
-    "initial_soil_moisture_mm": 5.0,
-    "base_soil_water_capacity_mm": 60.0,
-    "base_drainage_coeff": 0.01,
-    "base_runoff_fraction_max": 0.02,
+    "initial_soil_moisture": 5.0,
+    "drainage_coefficient": 0.01,
+    "max_runoff_fraction": 0.02,
     "runoff_exponent": 0.5,
-    "field_capacity_fraction": 0.40,
-    "reference_clay_pct": 60.0,
-    "clay_sensitivity": 0.10,
-    "pet_coeff_mm_per_degday": 0.05,
-    "biomass_half_sat_gC_m2": 20.0,
+    "rooting_depth": 0.2,
+    "depletion_fraction": 0.1,
+    "reference_et_coefficient": 0.05,
+    "biomass_half_saturation": 20.0,
 }
 
 
@@ -111,7 +77,8 @@ class Scenario:
     precip_mm: np.ndarray
     biomass_gC_m2: np.ndarray
     elevation_m: float
-    clay_pct: float
+    sand: float
+    clay: float
     params: dict[str, float] = field(default_factory=dict)
     # name -> predicate on the coverage counts; all must hold
     requires: dict[str, Callable[[dict], bool]] = field(default_factory=dict)
@@ -146,7 +113,8 @@ def build_scenarios() -> list[Scenario]:
             precip_mm=precip(1.5, 12.0),
             biomass_gC_m2=biomass_seasonal,
             elevation_m=100.0,
-            clay_pct=25.0,
+            sand=0.4,
+            clay=0.2,
         ),
         Scenario(
             name="cold_upland",
@@ -155,7 +123,8 @@ def build_scenarios() -> list[Scenario]:
             precip_mm=precip(2.0, 15.0),
             biomass_gC_m2=biomass_seasonal * 0.6,
             elevation_m=2500.0,
-            clay_pct=30.0,
+            sand=0.35,
+            clay=0.25,
             requires={"frozen_weeks": lambda c: c["frozen_weeks"] > 50},
         ),
         Scenario(
@@ -165,7 +134,8 @@ def build_scenarios() -> list[Scenario]:
             precip_mm=precip(3.0, 40.0),
             biomass_gC_m2=biomass_seasonal,
             elevation_m=50.0,
-            clay_pct=70.0,
+            sand=0.15,
+            clay=0.5,
             requires={"saturated_weeks": lambda c: c["saturated_weeks"] > 20},
         ),
         Scenario(
@@ -175,43 +145,40 @@ def build_scenarios() -> list[Scenario]:
             precip_mm=precip(0.5, 6.0),
             biomass_gC_m2=dry_biomass,
             elevation_m=400.0,
-            clay_pct=2.0,
+            sand=0.9,
+            clay=0.03,
             requires={
                 "zero_biomass_weeks": lambda c: c["zero_biomass_weeks"] > 20,
                 "near_empty_weeks": lambda c: c["near_empty_weeks"] > 20,
             },
         ),
         Scenario(
-            name="clipped_high",
+            name="upper_corner",
             description=(
-                "Clay beyond its clip bounds, high elevation, parameters at the "
-                "upper corners of the calibration bounds."
+                "Clay-rich, high elevation, parameters at the upper corners of "
+                "the calibration bounds."
             ),
             temp_c=_seasonal(n, 12.0, 8.0) + noise(1.5),
             precip_mm=precip(1.5, 20.0),
             biomass_gC_m2=biomass_seasonal,
             elevation_m=6000.0,
-            clay_pct=95.0,
+            sand=0.2,
+            clay=0.45,
             params=PARAMS_HIGH,
-            requires={
-                "clay_clipped": lambda c: c["clay_clipped"],
-                "capacity_clipped": lambda c: c["capacity_clipped"],
-            },
         ),
         Scenario(
-            name="clipped_low",
+            name="lower_corner",
             description=(
-                "Low clay, parameters at the lower corners of the calibration bounds."
+                "Sandy, sea level, parameters at the lower corners of the "
+                "calibration bounds."
             ),
             temp_c=_seasonal(n, 12.0, 8.0) + noise(1.5),
             precip_mm=precip(1.5, 20.0),
             biomass_gC_m2=biomass_seasonal,
             elevation_m=0.0,
-            clay_pct=0.0,
+            sand=0.9,
+            clay=0.02,
             params=PARAMS_LOW,
-            requires={
-                "capacity_clipped": lambda c: c["capacity_clipped"],
-            },
         ),
         Scenario(
             name="negative_inputs",
@@ -220,7 +187,8 @@ def build_scenarios() -> list[Scenario]:
             precip_mm=negative_precip,
             biomass_gC_m2=negative_biomass,
             elevation_m=100.0,
-            clay_pct=25.0,
+            sand=0.4,
+            clay=0.2,
             requires={
                 "negative_precip_weeks": lambda c: c["negative_precip_weeks"] > 0,
                 "negative_biomass_weeks": lambda c: c["negative_biomass_weeks"] > 0,
@@ -229,50 +197,8 @@ def build_scenarios() -> list[Scenario]:
     ]
 
 
-def load_legacy_module():
-    """Import the legacy model module from git commit ``LEGACY_REF``."""
-    source = subprocess.run(
-        ["git", "show", f"{LEGACY_REF}:{LEGACY_PATH}"],
-        cwd=REPO_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout
-    tmp = Path(tempfile.mkdtemp()) / "legacy_soil_moisture_model.py"
-    tmp.write_text(source)
-    spec = importlib.util.spec_from_file_location("legacy_soil_moisture_model", tmp)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def run_legacy(scenario: Scenario) -> dict[str, np.ndarray]:
-    """Run the legacy model and return its outputs keyed by legacy column name."""
-    import pandas as pd
-
-    legacy = load_legacy_module()
-    params = legacy.SoilWaterParams(**scenario.params)
-    df = legacy.simulate_soil_water_balance(
-        pd.DataFrame(
-            {
-                "temp_c": scenario.temp_c,
-                "precip_mm": scenario.precip_mm,
-                "biomass_gC_m2": scenario.biomass_gC_m2,
-            }
-        ),
-        elevation_m=scenario.elevation_m,
-        clay_pct=scenario.clay_pct,
-        params=params,
-    )
-    out = {k: df[k].to_numpy() for k in TIME_SERIES_OUTPUTS}
-    out.update({k: np.asarray(df[k].iloc[0]) for k in SITE_OUTPUTS})
-    return out
-
-
 def run_current(scenario: Scenario) -> dict[str, np.ndarray]:
-    """Run the working-tree model and return outputs keyed by legacy column name."""
+    """Run the working-tree model and return its outputs."""
     sys.path.insert(0, str(REPO_ROOT / "tests"))
     from regression_adapter import run_scenario
 
@@ -286,52 +212,30 @@ def scenario_inputs(scenario: Scenario) -> dict:
         "precip_mm": scenario.precip_mm,
         "biomass_gC_m2": scenario.biomass_gC_m2,
         "elevation_m": scenario.elevation_m,
-        "clay_pct": scenario.clay_pct,
+        "sand": scenario.sand,
+        "clay": scenario.clay,
         "params": dict(scenario.params),
     }
 
 
 def coverage_counts(scenario: Scenario, out: dict[str, np.ndarray]) -> dict:
     """Count how often each branch of the model was exercised."""
-    capacity = float(out["soil_water_capacity_mm"])
-    initial = PARAMS_DEFAULT_INITIAL
-    if "initial_soil_moisture_mm" in scenario.params:
-        initial = scenario.params["initial_soil_moisture_mm"]
-    s_prev = np.concatenate(
-        [[np.clip(initial, 0.0, capacity)], out["soil_moisture_mm"][:-1]]
+    capacity = float(out["soil.soil_water_capacity"])
+    initial = scenario.params.get(
+        "initial_soil_moisture", float(out["soil.field_capacity"])
     )
-    infiltration = out["throughfall_mm"] - out["runoff_mm"]
-
-    p = {**PARAMS_DEFAULT, **scenario.params}
-    clay = float(np.clip(scenario.clay_pct, 0.0, 80.0))
-    dclay = (clay - p["reference_clay_pct"]) * p["clay_sensitivity"] / 100.0
-    raw_capacity = p["base_soil_water_capacity_mm"] * (1.0 + dclay)
-
+    s_prev = np.concatenate(
+        [[np.clip(initial, 0.0, capacity)], out["soil_moisture"][:-1]]
+    )
+    infiltration = out["throughfall"] - out["runoff"]
     return {
-        "frozen_weeks": int(np.sum(out["frozen_soil"])),
+        "frozen_weeks": int(np.sum(out["frozen"])),
         "saturated_weeks": int(np.sum(s_prev + infiltration >= capacity - 1e-9)),
         "zero_biomass_weeks": int(np.sum(scenario.biomass_gC_m2 <= 0.0)),
         "near_empty_weeks": int(np.sum(out["relative_soil_moisture"] < 0.05)),
         "negative_precip_weeks": int(np.sum(scenario.precip_mm < 0.0)),
         "negative_biomass_weeks": int(np.sum(scenario.biomass_gC_m2 < 0.0)),
-        "clay_clipped": bool(clay != scenario.clay_pct),
-        "capacity_clipped": bool(not np.isclose(raw_capacity, capacity)),
     }
-
-
-PARAMS_DEFAULT = {
-    "initial_soil_moisture_mm": 50.0,
-    "base_soil_water_capacity_mm": 160.0,
-    "base_drainage_coeff": 0.10,
-    "base_runoff_fraction_max": 0.45,
-    "runoff_exponent": 2.0,
-    "field_capacity_fraction": 0.70,
-    "reference_clay_pct": 25.0,
-    "clay_sensitivity": 0.04,
-    "pet_coeff_mm_per_degday": 0.15,
-    "biomass_half_sat_gC_m2": 150.0,
-}
-PARAMS_DEFAULT_INITIAL = PARAMS_DEFAULT["initial_soil_moisture_mm"]
 
 
 def save_fixture(path: Path, scenario: Scenario, out: dict, meta: dict) -> None:
@@ -341,7 +245,8 @@ def save_fixture(path: Path, scenario: Scenario, out: dict, meta: dict) -> None:
         "input__precip_mm": scenario.precip_mm,
         "input__biomass_gC_m2": scenario.biomass_gC_m2,
         "input__elevation_m": np.asarray(scenario.elevation_m),
-        "input__clay_pct": np.asarray(scenario.clay_pct),
+        "input__sand": np.asarray(scenario.sand),
+        "input__clay": np.asarray(scenario.clay),
         "meta": np.asarray(json.dumps(meta, indent=2, sort_keys=True)),
     }
     arrays.update({f"param__{k}": np.asarray(v) for k, v in scenario.params.items()})
@@ -351,33 +256,25 @@ def save_fixture(path: Path, scenario: Scenario, out: dict, meta: dict) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
         "--check",
         action="store_true",
         help="Compare freshly generated outputs with the stored fixtures.",
     )
-    parser.add_argument(
+    mode.add_argument(
         "--fixed-by",
         metavar="REASON",
-        help=(
-            "Generate outputs from the working-tree model instead of the legacy "
-            "commit, recording REASON (the fixing commit's subject) in the metadata."
-        ),
+        help="Regenerate the fixtures, recording REASON (the commit subject).",
     )
     args = parser.parse_args()
 
     FIXTURE_DIR.mkdir(parents=True, exist_ok=True)
+    scenarios = build_scenarios()
     failures = []
-    for scenario in build_scenarios():
+    for scenario in scenarios:
         path = FIXTURE_DIR / f"{scenario.name}.npz"
-        if args.check:
-            # Compare against whichever model produced the stored fixture.
-            with np.load(path) as stored:
-                source = json.loads(str(stored["meta"]))["source"]
-            from_legacy = source.startswith("legacy")
-        else:
-            from_legacy = not args.fixed_by
-        out = run_legacy(scenario) if from_legacy else run_current(scenario)
+        out = run_current(scenario)
         counts = coverage_counts(scenario, out)
         unmet = [k for k, ok in scenario.requires.items() if not ok(counts)]
         if unmet:
@@ -385,23 +282,30 @@ def main() -> None:
 
         if args.check:
             with np.load(path) as stored:
+                stored_keys = {k for k in stored.files if k.startswith("output__")}
+                if stored_keys != {f"output__{k}" for k in out}:
+                    failures.append(f"{scenario.name}: outputs differ from fixture")
                 for k, v in out.items():
-                    if not np.array_equal(stored[f"output__{k}"], v):
+                    key = f"output__{k}"
+                    if key in stored and not np.array_equal(
+                        stored[key], v, equal_nan=True
+                    ):
                         failures.append(f"{scenario.name}: {k} differs from fixture")
             continue
 
         meta = {
             "scenario": scenario.name,
             "description": scenario.description,
-            "source": (
-                f"working tree ({args.fixed_by})"
-                if args.fixed_by
-                else f"legacy {LEGACY_REF}:{LEGACY_PATH}"
-            ),
+            "source": f"working tree ({args.fixed_by})",
             "coverage": counts,
         }
         save_fixture(path, scenario, out, meta)
         print(f"wrote {path.relative_to(REPO_ROOT)}  {counts}")
+
+    names = {f"{s.name}.npz" for s in scenarios}
+    stale = sorted(p.name for p in FIXTURE_DIR.glob("*.npz") if p.name not in names)
+    if stale:
+        failures.append(f"fixtures with no scenario: {stale}")
 
     if failures:
         sys.exit("\n".join(failures))

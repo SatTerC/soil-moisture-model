@@ -23,6 +23,19 @@ Refactors that leave outputs unchanged are not listed.
 
 ### Changed
 
+- **The soil store is derived from texture and rooting depth, and the model outputs volumetric water content.**
+  The soil water capacity was a calibrated nominal value scaled by clay content, and field capacity a calibrated fraction of it.
+  The store now holds the water above the wilting point over the rooting depth $Z_r$: field capacity $S_{fc} = 1000(\theta_{FC} - \theta_{WP})Z_r$, `[FAO56]`'s total available water, eq. (82), and capacity $S_{\max} = 1000(\theta_{sat} - \theta_{WP})Z_r$.
+  The water contents come from the `[SR06]` pedotransfer functions in sand, clay and organic matter.
+  The new output `soil_water_content` is $\theta = \theta_{WP} + S/(1000 Z_r)$ in m³ m⁻³, the quantity FLUXNET SWC and sgam use.
+  `simulate` now takes `sand` and `clay` as fractions by weight (was `clay` in percent), and an optional `organic_matter` fraction, default 0.025.
+  The initial soil moisture defaults to field capacity instead of 50 mm.
+  New parameters: `SoilWaterParams.rooting_depth` (default 1 m) and `depletion_fraction`, moved from `ModelConstants` so that both can vary per pixel, for example by plant functional type.
+  Removed: `SoilWaterParams.nominal_soil_water_capacity`, `field_capacity_fraction`, `nominal_clay` and `clay_sensitivity`; `ModelConstants.clay_bounds` and `soil_water_capacity_bounds`.
+  `SoilProperties` now holds the three water contents, `field_capacity` and `soil_water_capacity`; texture for which the water contents are not ordered gives NaN.
+  For the loam in `temperate_default`, the store grows from 160 to 322 mm, with field capacity 143 mm; runoff falls from 301 to 132 mm a year and drainage rises from 110 to 281 mm, while actual evapotranspiration is unchanged at 393 mm.
+  Mean soil moisture, 190 mm, sits above field capacity, because water above it drains at only 10 % a week; see the Deviations in the notation.
+  The regression scenarios now specify sand and clay fractions, `clipped_high` and `clipped_low` become `upper_corner` and `lower_corner`, and the fixtures can no longer be regenerated from the original model.
 - **Drainage and runoff no longer depend on clay.**
   The drainage coefficient and maximum runoff fraction were nominal values scaled by the clay offset $\Delta$ and clipped.
   Within the calibration bounds $|\Delta| \le 0.075$, so the scaling changed either by at most 4 %, and only the clips ever did much.

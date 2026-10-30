@@ -16,6 +16,9 @@ def test_store_within_capacity(inputs):
     assert np.all(out.soil_moisture >= 0.0)
     assert np.all(out.soil_moisture <= out.soil.soil_water_capacity)
     assert np.all((out.relative_soil_moisture >= 0) & (out.relative_soil_moisture <= 1))
+    theta = out.soil_water_content
+    assert np.all(theta >= out.soil.water_content_at_wilting_point - 1e-12)
+    assert np.all(theta <= out.soil.water_content_at_saturation + 1e-12)
 
 
 @SETTINGS

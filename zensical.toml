@@ -1,23 +1,34 @@
 [project]
 site_name = "Soil Moisture Model"
-site_description = "A Python package"
-site_author = "Your Name"
+site_description = "A reduced-complexity weekly bucket model of soil moisture"
+site_author = "vmyrgiotis, jmarshrossney"
 
 site_url = "https://SatTerC.github.io/soil-moisture-model"
 repo_name = "SatTerC/soil-moisture-model"
 repo_url = "https://github.com/SatTerC/soil-moisture-model"
-copyright = "Copyright &copy; 2026 Your Name"
+copyright = "Copyright &copy; 2026 vmyrgiotis, jmarshrossney"
 
 use_directory_urls = false
+
+nav = [
+    { "Home" = "index.md" },
+    { "Science" = "science.md" },
+    { "Notation" = "notation.md" },
+    { "API Reference" = [
+        "API_Reference/model.md",
+        "API_Reference/params.md",
+        "API_Reference/processes.md",
+    ] },
+]
 
 # Katex
 extra_javascript = [
     "_static/js/katex.js",
-    "https://unpkg.com/katex@0/dist/katex.min.js",
-    "https://unpkg.com/katex@0/dist/contrib/auto-render.min.js"
+    "https://unpkg.com/katex@0.16.22/dist/katex.min.js",
+    "https://unpkg.com/katex@0.16.22/dist/contrib/auto-render.min.js"
 ]
 extra_css = [
-    "https://unpkg.com/katex@0/dist/katex.min.css"
+    "https://unpkg.com/katex@0.16.22/dist/katex.min.css"
 ]
 
 [project.theme]
@@ -76,6 +87,9 @@ alternate_style = true
 # Mkdocstrings
 # ------------
 
+[project.plugins.mkdocstrings]
+custom_templates = "docs_tools/templates"
+
 [project.plugins.mkdocstrings.handlers.python]
 inventories = ["https://docs.python.org/3/objects.inv"]
 paths = ["src"]
@@ -84,6 +98,7 @@ paths = ["src"]
 annotations_path = "brief"
 docstring_style = "numpy"
 docstring_section_style = "list"
+members_order = "source"
 inherited_members = true
 line_length = 88
 merge_init_into_class = true

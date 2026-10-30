@@ -1,3 +1,17 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "soil_moisture_model",
+#     "netcdf4>=1.7",
+#     "pandas>=2.2",
+#     "pyarrow>=18.0",
+#     "scipy>=1.14",
+#     "xarray>=2025.1",
+# ]
+#
+# [tool.uv.sources]
+# soil_moisture_model = { path = "..", editable = true }
+# ///
 """Calibrate the soil moisture model against ICOS soil water content.
 
 For each ICOS ecosystem station of a selected vegetation type, this script
@@ -23,7 +37,7 @@ Outputs (in ``--out-dir``, updated after every site so a run can be resumed):
 
 Usage
 -----
-    uv run --group calibration python scripts/calibrate_icos.py --help
+    uv run scripts/calibrate_icos.py --help
 
 TODO: the objective compares soil moisture in mm with SWC in volumetric percent.
 See the science review issue before relying on calibrated values.

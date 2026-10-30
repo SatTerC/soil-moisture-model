@@ -38,15 +38,15 @@ just docs          # build the documentation
 Any change that alters the numbers must regenerate them in its own commit, with an entry in `CHANGELOG.md`:
 
 ```sh
-uv run python scripts/make_regression_fixtures.py --fixed-by "<commit subject>"
-uv run --with pandas python scripts/make_regression_fixtures.py --check
+uv run scripts/make_regression_fixtures.py --fixed-by "<commit subject>"
+uv run scripts/make_regression_fixtures.py --check
 ```
 
 ### Calibration
 
 `scripts/calibrate_icos.py` calibrates the model against ICOS soil water content observations.
-Its dependencies are in the `calibration` group:
+It declares its own dependencies inline, so `uv run` installs them in an isolated environment:
 
 ```sh
-uv run --group calibration python scripts/calibrate_icos.py --help
+uv run scripts/calibrate_icos.py --help
 ```

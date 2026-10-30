@@ -1,3 +1,14 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "soil_moisture_model",
+#     "numpy>=2.4.2",
+#     "pandas>=2.2",
+# ]
+#
+# [tool.uv.sources]
+# soil_moisture_model = { path = "..", editable = true }
+# ///
 """Generate (or check) the regression fixtures in tests/fixtures/regression/.
 
 The fixtures pin the numerical behaviour of the model on a handful of synthetic
@@ -10,9 +21,9 @@ behaviour lands, regenerate them from the working tree with ``--fixed-by``.
 
 Usage
 -----
-    uv run --with pandas python scripts/make_regression_fixtures.py
-    uv run --with pandas python scripts/make_regression_fixtures.py --check
-    uv run python scripts/make_regression_fixtures.py --fixed-by "<commit subject>"
+    uv run scripts/make_regression_fixtures.py
+    uv run scripts/make_regression_fixtures.py --check
+    uv run scripts/make_regression_fixtures.py --fixed-by "<commit subject>"
 """
 
 import argparse

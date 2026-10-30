@@ -17,15 +17,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-calibration = [
-    "netcdf4>=1.7",
-    "pandas>=2.2",
-    "pyarrow>=18.0",
-    "scipy>=1.14",
-    "xarray>=2025.1",
-]
 dev = [
-    {include-group = "calibration"},
     {include-group = "test"},
     {include-group = "docs"},
     "pre-commit>=4.6.0",
@@ -41,6 +33,12 @@ test = [
     "hypothesis>=6.0",
     "pytest>=9.0.2",
     "pytest-cov>=6.0",
+    # Smoke test of scripts/calibrate_icos.py; keep in step with its inline metadata
+    "netcdf4>=1.7",
+    "pandas>=2.2",
+    "pyarrow>=18.0",
+    "scipy>=1.14",
+    "xarray>=2025.1",
 ]
 
 [tool.ruff]
@@ -77,7 +75,7 @@ include = ["src/", "tests/"]
 
 [tool.pytest.ini_options]
 filterwarnings = [
-    # Raised by netCDF4/xarray (calibration group only) under numpy >= 2.5
+    # Raised by netCDF4/xarray (test group only) under numpy >= 2.5
     "ignore:numpy.ndarray size changed:RuntimeWarning",
     "ignore:Setting the shape on a NumPy array:DeprecationWarning",
 ]

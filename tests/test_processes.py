@@ -5,11 +5,14 @@ import pytest
 
 from soil_moisture_model import ModelConstants, SoilWaterParams, simulate
 from soil_moisture_model.processes import (
+    atmospheric_pressure,
     biomass_saturation,
     crop_coefficient,
     elevation_et_multiplier,
     interception_capacity,
+    psychrometric_constant,
     reference_evapotranspiration,
+    saturation_vapour_pressure_slope,
     soil_properties,
 )
 
@@ -41,12 +44,22 @@ def test_biomass_effects_span_their_ranges():
 
 
 class TestElevation:
-    def test_sea_level_is_neutral(self):
-        assert elevation_et_multiplier(0.0) == 1.0
+    def test_fao56_annex_values(self):
+        # [FAO56] Annex 2, Tables 2.1, 2.2 and 2.4
+        assert atmospheric_pressure(0.0) == pytest.approx(101.3)
+        assert atmospheric_pressure(1000.0) == pytest.approx(90.0, abs=0.05)
+        assert psychrometric_constant(1000.0) == pytest.approx(0.060, abs=5e-4)
+        assert saturation_vapour_pressure_slope(20.0) == pytest.approx(0.145, abs=5e-4)
 
-    @pytest.mark.parametrize(("z", "bound"), [(10_000.0, 1), (-10_000.0, 0)])
-    def test_clipped(self, z, bound):
-        assert elevation_et_multiplier(z) == C.elevation_et_multiplier_bounds[bound]
+    def test_sea_level_is_neutral(self):
+        assert elevation_et_multiplier(0.0, [0.0, 10.0, 30.0]) == pytest.approx(1.0)
+
+    def test_rises_with_elevation_and_falls_with_temperature(self):
+        z = np.array([-400.0, 0.0, 1000.0, 3000.0])
+        m = elevation_et_multiplier(z, 20.0)
+        assert np.all(np.diff(m) > 0)
+        assert elevation_et_multiplier(1000.0, 10.0) > m[2]
+        assert m[2] == pytest.approx(1.037, abs=1e-3)
 
 
 def test_reference_evapotranspiration_degree_days():

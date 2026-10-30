@@ -129,12 +129,6 @@ class ModelConstants:
     # --- Evapotranspiration ---
     base_temperature: float = 0.0
     r"""Temperature above which degree-days accumulate, $T_b$ (degC)."""
-    elevation_et_gradient: float = 0.08
-    r"""Fractional increase in reference evapotranspiration per kilometre of
-    elevation, $g_z$ (per km)."""
-    elevation_et_multiplier_bounds: tuple[float, float] = (0.75, 1.35)
-    r"""Clip bounds of the elevation multiplier, $(m_{z,\min}, m_{z,\max})$
-    (dimensionless)."""
 
     # --- Clay effects ---
     clay_bounds: tuple[float, float] = (0.0, 80.0)

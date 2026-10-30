@@ -136,8 +136,10 @@ Dimensionless and shape `(time, *space)`, except where noted.
 | freezing temperature | $T_{\mathrm{frz}}$ | `freezing_temperature` | °C; week $t$ is frozen if $T_t < T_{\mathrm{frz}}$ |
 | reference ET coefficient | $c_{ET}$ | `reference_et_coefficient` | mm °C⁻¹ day⁻¹ |
 | elevation | $z$ | `elevation` | m, shape `space` |
-| elevation multiplier | $m_z$, bounds $m_{z,\min}$, $m_{z,\max}$ | `elevation_et_multiplier`, `elevation_et_multiplier_bounds` | |
-| elevation gradient | $g_z$ | `elevation_et_gradient` | per km |
+| elevation multiplier | $m_z = (s + \gamma_{\mathrm{psy}}(0)) / (s + \gamma_{\mathrm{psy}}(z))$ | `elevation_et_multiplier` | dimensionless |
+| atmospheric pressure | $p_{\mathrm{atm}}$ | `atmospheric_pressure` | kPa; `[FAO56]` eq. (7) |
+| psychrometric constant | $\gamma_{\mathrm{psy}}$ | `psychrometric_constant` | kPa °C⁻¹; `[FAO56]` eq. (8) |
+| slope of the saturation vapour pressure curve | $s$ | `saturation_vapour_pressure_slope` | kPa °C⁻¹; `[FAO56]` eq. (13) |
 | frozen infiltration fraction | $\phi^{\mathrm{frz}}$ | `frozen_infiltration_fraction` | |
 | frozen multipliers | $m^{\mathrm{frz}}_{ET}$, $m^{\mathrm{frz}}_{d}$ | `frozen_reference_et_multiplier`, `frozen_drainage_multiplier` | scale $ET_o$ and $k_d$ |
 | effective (frozen-adjusted) values | $ET_o^{\mathrm{eff}}$, $k_d^{\mathrm{eff}}$ | suffix `_eff` | equal the plain value in unfrozen weeks |
@@ -165,6 +167,9 @@ Each is deliberate.
 - **$ET_p$ is `[FAO56]`'s $ET_c$ only in an unfrozen week.**
   Potential evapotranspiration is $ET_p = K_c\,ET_o^{\mathrm{eff}}$, which equals `[FAO56]`'s crop evapotranspiration $ET_c = K_c\,ET_o$ except in a frozen week, where $ET_o^{\mathrm{eff}} < ET_o$.
   It therefore has its own symbol.
+- **Three `[FAO56]` symbols are renamed to avoid collisions.**
+  `[FAO56]` writes atmospheric pressure $P$, the psychrometric constant $\gamma$ and the slope of the saturation vapour pressure curve $\Delta$.
+  Here $P$ is precipitation, $\gamma$ the runoff exponent and $\Delta$ the clay offset, so these are $p_{\mathrm{atm}}$, $\gamma_{\mathrm{psy}}$ and $s$.
 - **$K_s$ is the water-stress coefficient, not saturated hydraulic conductivity.**
   Soil physics often writes saturated hydraulic conductivity as $K_s$; this model has none and follows `[FAO56]`.
 - **Field capacity is a fraction of the bucket, not a water content.**

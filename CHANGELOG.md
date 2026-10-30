@@ -23,6 +23,13 @@ Refactors that leave outputs unchanged are not listed.
 
 ### Changed
 
+- **The elevation multiplier on reference evapotranspiration now follows from atmospheric pressure.**
+  It was $1 + 0.08\,z/1000$, clipped to [0.75, 1.35]: a fixed 8 % per kilometre.
+  It is now the equilibrium evaporation factor $s / (s + \gamma_{\mathrm{psy}})$ relative to sea level, with pressure, psychrometric constant and vapour pressure slope from `[FAO56]` eqs. (7), (8) and (13).
+  The sign is unchanged: lower pressure at altitude lowers $\gamma_{\mathrm{psy}}$, which raises demand at a given temperature.
+  The size is roughly halved, to about 4 % per kilometre at 20 °C and 5 % at 10 °C, and it no longer needs a clip.
+  Removed: `ModelConstants.elevation_et_gradient` and `ModelConstants.elevation_et_multiplier_bounds`; `processes.elevation_et_multiplier` now takes temperature instead of constants.
+  Annual reference evapotranspiration falls by 6 % in `cold_upland` (2500 m) and by 7 % in `clipped_high` (6000 m); `temperate_default` (100 m) is unchanged to within 0.5 %.
 - **The default reference ET coefficient is 0.15 mm °C⁻¹ day⁻¹, down from 0.55.**
   At 0.55 the degree-day relation gave 5.5 mm per day of reference evapotranspiration at 10 °C and 11 mm per day at 20 °C.
   `[FAO56]` Table 2 gives 1–2 and 2–4 mm per day for humid and sub-humid temperate regions, so 0.15 sits in the middle of both.

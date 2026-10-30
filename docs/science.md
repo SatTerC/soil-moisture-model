@@ -65,15 +65,20 @@ The store after infiltration is then $S^{+}_t = S_{t-1} + F \le S_{\max}$.
 
 ### Evapotranspiration
 
-Reference evapotranspiration comes from a degree-day relation, scaled by elevation:
+Reference evapotranspiration comes from a degree-day relation, scaled by an elevation multiplier:
 
 $$
 ET_o = c_{ET} \cdot 7 \max(T - T_b,\ 0) \cdot m_z,
 \qquad
-m_z = \mathrm{clip}\left(1 + g_z \frac{z}{1000},\ m_{z,\min},\ m_{z,\max}\right)
+m_z = \frac{s + \gamma_{\mathrm{psy}}(0)}{s + \gamma_{\mathrm{psy}}(z)}
 $$
 
-where $T$ is weekly mean air temperature (°C), $T_b$ the base temperature, $c_{ET}$ the calibrated reference ET coefficient (mm °C⁻¹ day⁻¹), $z$ the elevation (m), $g_z$ the elevation gradient (per km) and $m_z$ the elevation multiplier.
+where $T$ is weekly mean air temperature (°C), $T_b$ the base temperature, $c_{ET}$ the calibrated reference ET coefficient (mm °C⁻¹ day⁻¹), $z$ the elevation (m) and $m_z$ the elevation multiplier.
+
+The elevation multiplier is the equilibrium evaporation factor $s / (s + \gamma_{\mathrm{psy}})$ at the site, relative to sea level.
+Here $s$ is the slope of the saturation vapour pressure curve at $T$, `[FAO56]` eq. (13), and $\gamma_{\mathrm{psy}}(z)$ the psychrometric constant, `[FAO56]` eq. (8), at the atmospheric pressure of elevation $z$, `[FAO56]` eq. (7).
+Lower pressure at altitude lowers $\gamma_{\mathrm{psy}}$, so at a given temperature demand rises with elevation, by about 4 % per kilometre at 20 °C.
+The multiplier has no free parameters.
 
 Alternatively, $ET_o$ can be passed to `simulate` directly, from any method that uses more than temperature, such as `[FAO56]` Penman–Monteith.
 The degree-day relation, and with it the elevation multiplier and $c_{ET}$, is then not used.

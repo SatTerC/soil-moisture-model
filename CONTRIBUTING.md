@@ -71,3 +71,4 @@ Locals in `simulate` and the process functions that stand for a symbol.
 | — | `degree_day_reference_et` | import alias of `processes.reference_evapotranspiration`, which the `simulate` argument of that name shadows |
 | $\Delta$ | `delta` | |
 | $T$ | `temp` | never `t` |
+| $s$ | `slope` | `s` is reserved for the store |

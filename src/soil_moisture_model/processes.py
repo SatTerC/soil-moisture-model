@@ -96,31 +96,99 @@ def interception_capacity(
     )
 
 
-def elevation_et_multiplier(
-    elevation: ArrayLike, constants: ModelConstants = DEFAULT_CONSTANTS
-) -> NDArray:
-    r"""Return the multiplier on reference evapotranspiration due to elevation.
+def atmospheric_pressure(elevation: ArrayLike) -> NDArray:
+    r"""Return atmospheric pressure from elevation, `[FAO56]` eq. (7).
 
     $$
-    m_z = \mathrm{clip}\left(1 + g_z\, \frac{z}{1000},\; m_{z,\min},\; m_{z,\max}\right)
+    p_{\mathrm{atm}} = 101.3 \left(\frac{293 - 0.0065\, z}{293}\right)^{5.26}
     $$
 
     Parameters
     ----------
     elevation
         Site elevation, $z$ (metres).
-    constants
-        Supplies `elevation_et_gradient`, $g_z$, and
-        `elevation_et_multiplier_bounds`, $(m_{z,\min}, m_{z,\max})$.
+
+    Returns
+    -------
+    NDArray
+        Atmospheric pressure, $p_{\mathrm{atm}}$ (kPa).
+    """
+    z = np.asarray(elevation, dtype=float)
+    return 101.3 * ((293.0 - 0.0065 * z) / 293.0) ** 5.26
+
+
+def psychrometric_constant(elevation: ArrayLike) -> NDArray:
+    r"""Return the psychrometric constant, `[FAO56]` eq. (8).
+
+    $$
+    \gamma_{\mathrm{psy}} = 0.665 \times 10^{-3}\, p_{\mathrm{atm}}
+    $$
+
+    Parameters
+    ----------
+    elevation
+        Site elevation, $z$ (metres); see `atmospheric_pressure`.
+
+    Returns
+    -------
+    NDArray
+        Psychrometric constant, $\gamma_{\mathrm{psy}}$ (kPa per degC).
+    """
+    return 0.665e-3 * atmospheric_pressure(elevation)
+
+
+def saturation_vapour_pressure_slope(temperature: ArrayLike) -> NDArray:
+    r"""Return the slope of the saturation vapour pressure curve, `[FAO56]` eq. (13).
+
+    $$
+    s = \frac{4098 \times 0.6108 \exp\left(\frac{17.27\, T}{T + 237.3}\right)}
+             {(T + 237.3)^2}
+    $$
+
+    Parameters
+    ----------
+    temperature
+        Air temperature, $T$ (degC).
+
+    Returns
+    -------
+    NDArray
+        Slope of the saturation vapour pressure curve, $s$ (kPa per degC).
+    """
+    temp = np.asarray(temperature, dtype=float)
+    return 4098.0 * 0.6108 * np.exp(17.27 * temp / (temp + 237.3)) / (temp + 237.3) ** 2
+
+
+def elevation_et_multiplier(elevation: ArrayLike, temperature: ArrayLike) -> NDArray:
+    r"""Return the multiplier on reference evapotranspiration due to elevation.
+
+    The multiplier is the equilibrium evaporation factor $s / (s +
+    \gamma_{\mathrm{psy}})$ at the site, relative to its value at sea level:
+
+    $$
+    m_z = \frac{s + \gamma_{\mathrm{psy}}(0)}{s + \gamma_{\mathrm{psy}}(z)}
+    $$
+
+    Lower pressure at altitude lowers the psychrometric constant, so at a given
+    temperature $m_z \ge 1$ above sea level. At 20 degC it rises by about 4 %
+    per kilometre.
+
+    Parameters
+    ----------
+    elevation
+        Site elevation, $z$ (metres).
+    temperature
+        Air temperature, $T$ (degC); see `saturation_vapour_pressure_slope`.
 
     Returns
     -------
     NDArray
         Elevation multiplier, $m_z$ (dimensionless).
     """
-    z_km = np.asarray(elevation, dtype=float) / 1000.0
-    lo, hi = constants.elevation_et_multiplier_bounds
-    return np.clip(1.0 + constants.elevation_et_gradient * z_km, lo, hi)
+    slope = saturation_vapour_pressure_slope(temperature)
+    return (slope + psychrometric_constant(0.0)) / (
+        slope + psychrometric_constant(elevation)
+    )
 
 
 def reference_evapotranspiration(
@@ -148,7 +216,7 @@ def reference_evapotranspiration(
         Reference ET coefficient, the reference evapotranspiration per
         degree-day, $c_{ET}$ (mm per degC per day).
     constants
-        Supplies `base_temperature`, $T_b$, and the elevation settings.
+        Supplies `base_temperature`, $T_b$.
 
     Returns
     -------
@@ -158,7 +226,7 @@ def reference_evapotranspiration(
     temp = np.asarray(temperature, dtype=float)
     coefficient = np.asarray(reference_et_coefficient, dtype=float)
     degree_days = np.maximum(temp - constants.base_temperature, 0.0) * _DAYS_PER_WEEK
-    return coefficient * degree_days * elevation_et_multiplier(elevation, constants)
+    return coefficient * degree_days * elevation_et_multiplier(elevation, temp)
 
 
 @dataclass(frozen=True)

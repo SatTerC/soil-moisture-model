@@ -33,6 +33,7 @@ The Avoid column lists synonyms not used here, usually because they mean somethi
 | Effective reference ET times crop coefficient | potential evapotranspiration | PET | `[FAO56]` $ET_c$ in an unfrozen week |
 | Water drawn from the store by evapotranspiration | actual evapotranspiration | AET, ET (unqualified) | |
 | Reduction factor on evapotranspiration, 1 meaning unstressed | water-stress coefficient | water stress, stress factor | `[FAO56]` $K_s$ |
+| Fraction of the water held at field capacity that can be used before stress begins | depletion fraction | | `[FAO56]` $p$ |
 | Biomass-dependent multiplier on reference ET | crop coefficient | | `[FAO56]` $K_c$ |
 | Value of a soil property at the nominal clay content, before clay adjustment | nominal (*nominal soil water capacity*) | base, reference, standard | "base" is the degree-day base temperature; "reference" is reference ET; "standard" is `[FAO56]`'s standard conditions |
 | Clay content at which the nominal values apply | nominal clay content | reference clay, base clay | |
@@ -58,7 +59,8 @@ Weekly totals, mm wk⁻¹, shape `(time, *space)`, except the coefficients, whic
 | potential evapotranspiration | $ET_p = K_c\,ET_o^{\mathrm{eff}}$ | `potential_evapotranspiration` | |
 | actual evapotranspiration | $ET_a$ | `actual_evapotranspiration` | |
 | crop coefficient | $K_c$ | `crop_coefficient` | `[FAO56]` |
-| water-stress coefficient | $K_s$ | `water_stress_coefficient` | `[FAO56]`; $0 \le K_s \le 1$; not saturated hydraulic conductivity |
+| water-stress coefficient | $K_s = \min(1, S^{+} / ((1 - p) S_{fc}))$ | `water_stress_coefficient` | `[FAO56]` eq. (84); $0 \le K_s \le 1$; not saturated hydraulic conductivity |
+| depletion fraction | $p$ | `depletion_fraction` | `[FAO56]`; dimensionless, $0 \le p < 1$ |
 
 $ET$ is a single two-letter symbol, not $E \cdot T$.
 
@@ -105,10 +107,9 @@ The clay-adjusted properties are the nominal values scaled by the clay offset $\
 | clay offset | $\Delta = \kappa\,(C - C^{\circ})/100$ | — | — | |
 | drainage coefficient | $k_d$, nominal $k_d^{\circ}$ | — (fraction per week) | `drainage_coefficient`, `nominal_drainage_coefficient` | |
 | maximum runoff fraction | $r_{\max}$, nominal $r_{\max}^{\circ}$ | — | `max_runoff_fraction`, `nominal_max_runoff_fraction` | |
-| stress exponent | $\beta$, nominal $\beta^{\circ}$ | — | `stress_exponent`, `nominal_stress_exponent` | |
 | runoff exponent | $\gamma$ | — | `runoff_exponent` | not clay-adjusted |
 | field-capacity fraction | $\phi_{fc}$ | — | `field_capacity_fraction` | not clay-adjusted |
-| clay response factors | $a_d$, $a_r$, $a_\beta$ | — | `drainage_clay_response`, `runoff_clay_response`, `stress_clay_response` | subscripts are labels |
+| clay response factors | $a_d$, $a_r$ | — | `drainage_clay_response`, `runoff_clay_response` | subscripts are labels |
 
 $\theta$ is reserved for volumetric water content (m³ m⁻³), as in `[FAO56]` and sgam.
 This model has no volumetric water content, so $\theta$ does not appear; $\phi_{fc}$ and $S_r$ are fractions of the soil water capacity.
@@ -154,7 +155,7 @@ Clip bounds have no symbols; they are named only in `ModelConstants` and written
 | superscript $\mathrm{eff}$ | after the frozen-week adjustment | $k_d^{\mathrm{eff}}$ |
 | subscript $t$ | week index, $t = 1, \dots, n_t$ | $S_t$ |
 | subscript $0$ | before the first week, $t = 0$ | $S_0$, the initial soil moisture |
-| superscript $\circ$ | nominal value, at the nominal clay content | $S_{\max}^{\circ}$, $\beta^{\circ}$, $C^{\circ}$ |
+| superscript $\circ$ | nominal value, at the nominal clay content | $S_{\max}^{\circ}$, $k_d^{\circ}$, $C^{\circ}$ |
 
 Subscript $0$ means $t = 0$ and nothing else.
 In code names the circle becomes the prefix `nominal_`, as in `nominal_soil_water_capacity`.
@@ -175,6 +176,7 @@ Each is deliberate.
 - **Field capacity is a fraction of the bucket, not a water content.**
   `[FAO56]` $\theta_{FC}$ is volumetric water content at field capacity (m³ m⁻³).
   This model has no soil depth, so it uses $\phi_{fc}$, a fraction of $S_{\max}$, and reserves $\theta$.
-- **$K_s$ is a power law in the relative store after infiltration, not `[FAO56]`'s depletion function.**
-  Here $K_s = (S^{+} / S_{\max})^{\beta}$; `[FAO56]` eq. (84) uses root-zone depletion against TAW and RAW.
-  Same concept and range, different function.
+- **$K_s$ is `[FAO56]` eq. (84) applied to the store after infiltration.**
+  The store counts water above the wilting point, so `[FAO56]`'s total available water TAW is $S_{fc}$ and its root-zone depletion is $S_{fc} - S^{+}$, giving $K_s = \min(1, S^{+} / ((1 - p) S_{fc}))$.
+  `[FAO56]` evaluates depletion at the start of the day; here it is after the week's infiltration, because the step is a week.
+  $p$ is a constant: `[FAO56]`'s adjustment of $p$ for the rate of $ET_c$ is not applied.

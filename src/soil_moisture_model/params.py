@@ -31,7 +31,7 @@ _PARAM_RANGES: dict[str, tuple[float, float, bool]] = {
     "nominal_drainage_coefficient": (0.0, 1.0, False),
     "nominal_max_runoff_fraction": (0.0, 1.0, False),
     "runoff_exponent": (0.0, np.inf, True),
-    "field_capacity_fraction": (0.0, 1.0, False),
+    "field_capacity_fraction": (0.0, 1.0, True),
     "nominal_clay": (0.0, 100.0, False),
     "clay_sensitivity": (0.0, np.inf, False),
     "reference_et_coefficient": (0.0, np.inf, False),
@@ -130,6 +130,13 @@ class ModelConstants:
     base_temperature: float = 0.0
     r"""Temperature above which degree-days accumulate, $T_b$ (degC)."""
 
+    # --- Water stress ---
+    depletion_fraction: float = 0.5
+    r"""Fraction of the water held between field capacity and the empty store
+    that can be used before evapotranspiration is reduced, $p$ (dimensionless,
+    $0 \le p < 1$). `[FAO56]` Table 22 gives 0.3 to 0.7, and 0.5 "is commonly
+    used for many crops"."""
+
     # --- Clay effects ---
     clay_bounds: tuple[float, float] = (0.0, 80.0)
     """Clip bounds applied to the input clay content (percent)."""
@@ -139,12 +146,6 @@ class ModelConstants:
     runoff_clay_response: float = 0.5
     r"""Relative strength of the clay effect on the maximum runoff fraction,
     which it increases, $a_r$ (dimensionless)."""
-    stress_clay_response: float = 0.3
-    r"""Relative strength of the clay effect on the stress exponent, which it
-    increases, $a_\beta$ (dimensionless)."""
-    nominal_stress_exponent: float = 1.4
-    r"""Stress exponent at the nominal clay content, $\beta^{\circ}$
-    (dimensionless)."""
     soil_water_capacity_bounds: tuple[float, float] = (60.0, 320.0)
     """Clip bounds of the clay-adjusted soil water capacity (mm)."""
     drainage_coefficient_bounds: tuple[float, float] = (0.015, 0.25)
@@ -153,5 +154,3 @@ class ModelConstants:
     max_runoff_fraction_bounds: tuple[float, float] = (0.05, 0.90)
     """Clip bounds of the clay-adjusted maximum runoff fraction
     (dimensionless)."""
-    stress_exponent_bounds: tuple[float, float] = (1.0, 2.2)
-    """Clip bounds of the clay-adjusted stress exponent (dimensionless)."""

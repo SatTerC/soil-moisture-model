@@ -108,7 +108,8 @@ def simulate(
     4. Saturation excess $Q_e = \max(S_{t-1} + P_T - Q_s - S_{\max}, 0)$ also
        runs off: total runoff $Q = Q_s + Q_e$, infiltration $F = P_T - Q$.
     5. Store after infiltration $S^{+}_t = S_{t-1} + F \le S_{\max}$.
-    6. Water-stress coefficient $K_s = (S^{+}_t / S_{\max})^{\beta}$.
+    6. Water-stress coefficient $K_s = \min(1,\; S^{+}_t / ((1 - p) S_{fc}))$,
+       `[FAO56]` eq. (84).
     7. Actual evapotranspiration $ET_a = \min(K_s\, (ET_p - I),\; S^{+}_t)$.
     8. Drainage $D = k_d^{\mathrm{eff}} \max(S^{+}_t - ET_a - S_{fc}, 0)$, with
        field capacity $S_{fc} = \phi_{fc} S_{\max}$.
@@ -223,8 +224,9 @@ def simulate(
 
     s_max = np.broadcast_to(soil.soil_water_capacity, space)
     r_max = soil.max_runoff_fraction
-    beta = soil.stress_exponent
     s_fc = params.field_capacity_fraction * s_max
+    # [FAO56] eq. (84) with TAW = S_fc and depletion S_fc - S+: stress below this.
+    stress_onset = (1.0 - c.depletion_fraction) * s_fc
     frozen_runoff = (1.0 - c.frozen_infiltration_fraction) * throughfall
 
     s = np.clip(np.broadcast_to(initial_soil_moisture, space), 0.0, s_max)
@@ -243,7 +245,7 @@ def simulate(
         soil_moisture_after_infiltration = np.minimum(
             s_max, s + throughfall[t] - runoff[t]
         )
-        k_s[t] = np.clip((soil_moisture_after_infiltration / s_max) ** beta, 0.0, 1.0)
+        k_s[t] = np.minimum(soil_moisture_after_infiltration / stress_onset, 1.0)
         aet[t] = np.minimum(
             demand_on_store[t] * k_s[t], soil_moisture_after_infiltration
         )

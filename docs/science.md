@@ -12,7 +12,7 @@ Symbols and terms follow [Notation](notation.md).
 
 Three things set the store's behaviour:
 
-- **Soil texture.** Clay content changes the soil water capacity, drainage, runoff and the shape of the water-stress response.
+- **Soil texture.** Clay content changes the soil water capacity, drainage and runoff.
 - **Vegetation.** Plant biomass controls canopy interception and the crop coefficient.
 - **Climate.** Temperature drives evaporative demand and decides whether a week is frozen; precipitation supplies water.
 
@@ -99,13 +99,14 @@ Evaporating intercepted water uses part of the demand, and the rest, $ET_p - I$,
 Actual evapotranspiration is that remaining demand reduced by the water-stress coefficient $K_s$, and cannot exceed the store after infiltration:
 
 $$
-K_s = \left(\frac{S^{+}_t}{S_{\max}}\right)^{\beta},
+K_s = \min\left(1,\ \frac{S^{+}_t}{(1 - p)\, S_{fc}}\right),
 \qquad
 ET_a = \min\left(K_s\, (ET_p - I),\ S^{+}_t\right)
 $$
 
-The stress exponent $\beta$ increases with clay content, so clay soils hold water more tightly.
-This $K_s$ is a power law in the relative store after infiltration, not `[FAO56]` eq. (84), which uses root-zone depletion.
+This is `[FAO56]` eq. (84), with the field capacity $S_{fc}$ (see [Drainage](#drainage)) as the total available water.
+Evapotranspiration is unstressed until a fraction $p$, the depletion fraction, of the water held at field capacity has been used, and then falls linearly to zero as the store empties.
+`[FAO56]` Table 22 gives $p$ between 0.3 and 0.7 by crop; the default is 0.5, which `[FAO56]` says is commonly used for many crops.
 
 ### Drainage
 
@@ -145,18 +146,17 @@ $$
 $$
 
 with clay sensitivity $\kappa$.
-Each property is scaled linearly in the clay offset $\Delta$, with clay response factors $a_d$, $a_r$ and $a_\beta$, then clipped to a plausible range:
+Each property is scaled linearly in the clay offset $\Delta$, with clay response factors $a_d$ and $a_r$, then clipped to a plausible range:
 
 $$
 \begin{aligned}
 S_{\max} &= S_{\max}^{\circ}\,(1 + \Delta) \\
 k_d      &= k_d^{\circ}\,(1 - a_d \Delta) \\
-r_{\max} &= r_{\max}^{\circ}\,(1 + a_r \Delta) \\
-\beta    &= \beta^{\circ}\,(1 + a_\beta \Delta)
+r_{\max} &= r_{\max}^{\circ}\,(1 + a_r \Delta)
 \end{aligned}
 $$
 
-More clay therefore means more storage, slower drainage, more runoff and a steeper stress response.
+More clay therefore means more storage, slower drainage and more runoff.
 A single shared sensitivity $\kappa$ keeps the parameter count down.
 
 ## Frozen weeks

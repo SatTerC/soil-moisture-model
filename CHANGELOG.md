@@ -23,6 +23,16 @@ Refactors that leave outputs unchanged are not listed.
 
 ### Changed
 
+- **The water-stress coefficient is `[FAO56]` eq. (84).**
+  It was a power law, $K_s = (S^{+}/S_{\max})^{\beta}$, with $\beta = 1.4$ adjusted for clay, so evapotranspiration was reduced at any store below full capacity.
+  It is now $K_s = \min(1, S^{+} / ((1 - p) S_{fc}))$: `[FAO56]` eq. (84) with the field capacity $S_{fc}$ as the total available water.
+  Evapotranspiration is unstressed until a fraction $p$ of that water is used, then falls linearly to zero.
+  The new constant `ModelConstants.depletion_fraction`, $p = 0.5$, is the value `[FAO56]` says "is commonly used for many crops"; Table 22 gives 0.3 to 0.7.
+  Removed: `ModelConstants.nominal_stress_exponent`, `stress_clay_response`, `stress_exponent_bounds` and `SoilProperties.stress_exponent`.
+  The clay effect on $\beta$ goes with them; it moved $\beta$ by at most ±0.03 within the calibration bounds, so its clip never acted.
+  `SoilWaterParams.field_capacity_fraction` must now be strictly positive.
+  In `temperate_default`, the number of unstressed weeks rises from 90 to 517 of 520 and annual actual evapotranspiration from 323 to 392 mm, which is all the demand left after interception.
+  The `dry_sandy` regression scenario empties its store with default parameters again, so the arid coefficient and small store it was given earlier are removed.
 - **Interception is bounded by evaporative demand and uses part of it.**
   Intercepted water evaporated in full every week, up to 3 mm, even in frozen weeks and weeks with no demand, and transpiration then drew on the full potential evapotranspiration as well.
   Now $I = \min(P, f_B I_{\max}, ET_p)$, water the canopy holds but cannot evaporate falls through to the soil, and the store meets only the remaining demand: $ET_a = \min(K_s (ET_p - I), S^{+})$.

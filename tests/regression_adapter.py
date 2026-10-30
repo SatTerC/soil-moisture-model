@@ -53,5 +53,4 @@ def run_scenario(inputs: dict) -> dict[str, np.ndarray]:
         "soil_water_capacity_mm": out.soil.soil_water_capacity,
         "drainage_coeff": out.soil.drainage_coefficient,
         "runoff_fraction_max": out.soil.max_runoff_fraction,
-        "stress_exponent": out.soil.stress_exponent,
     }

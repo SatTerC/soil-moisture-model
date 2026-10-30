@@ -170,20 +170,12 @@ def build_scenarios() -> list[Scenario]:
         ),
         Scenario(
             name="dry_sandy",
-            description=(
-                "Dry, sandy site with seasonal spells of zero biomass, an arid "
-                "reference ET coefficient and a small store."
-            ),
+            description="Dry, sandy site with seasonal spells of zero biomass.",
             temp_c=_seasonal(n, 18.0, 8.0) + noise(1.5),
             precip_mm=precip(0.5, 6.0),
             biomass_gC_m2=dry_biomass,
             elevation_m=400.0,
             clay_pct=2.0,
-            # [FAO56] Table 2, arid temperate: 4-7 mm/day at 20 degC.
-            params={
-                "pet_coeff_mm_per_degday": 0.3,
-                "base_soil_water_capacity_mm": 60.0,
-            },
             requires={
                 "zero_biomass_weeks": lambda c: c["zero_biomass_weeks"] > 20,
                 "near_empty_weeks": lambda c: c["near_empty_weeks"] > 20,

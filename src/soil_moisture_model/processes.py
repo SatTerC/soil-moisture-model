@@ -244,9 +244,6 @@ class SoilProperties:
     max_runoff_fraction: NDArray[np.float64]
     r"""Maximum runoff fraction, the fraction of throughfall that runs off when
     the store is full, $r_{\max}$ (dimensionless)."""
-    stress_exponent: NDArray[np.float64]
-    r"""Stress exponent, the exponent of relative soil moisture in the
-    water-stress coefficient, $\beta$ (dimensionless)."""
 
 
 def soil_properties(
@@ -268,13 +265,11 @@ def soil_properties(
     \begin{aligned}
     S_{\max} &= S_{\max}^{\circ}\,(1 + \Delta) \\
     k_d      &= k_d^{\circ}\,(1 - a_d \Delta) \\
-    r_{\max} &= r_{\max}^{\circ}\,(1 + a_r \Delta) \\
-    \beta    &= \beta^{\circ}\,(1 + a_\beta \Delta)
+    r_{\max} &= r_{\max}^{\circ}\,(1 + a_r \Delta)
     \end{aligned}
     $$
 
-    So more clay means more storage, slower drainage, more runoff and a
-    steeper stress response.
+    So more clay means more storage, slower drainage and more runoff.
 
     Parameters
     ----------
@@ -285,8 +280,7 @@ def soil_properties(
         $r_{\max}^{\circ}$, `nominal_clay` ($C^{\circ}$) and `clay_sensitivity`
         ($\kappa$).
     constants
-        Supplies $\beta^{\circ}$, the clay response factors $a_d, a_r, a_\beta$ and all
-        clip bounds.
+        Supplies the clay response factors $a_d$ and $a_r$ and all clip bounds.
 
     Returns
     -------
@@ -310,9 +304,5 @@ def soil_properties(
         max_runoff_fraction=np.clip(
             params.nominal_max_runoff_fraction * (1.0 + c.runoff_clay_response * delta),
             *c.max_runoff_fraction_bounds,
-        ),
-        stress_exponent=np.clip(
-            c.nominal_stress_exponent * (1.0 + c.stress_clay_response * delta),
-            *c.stress_exponent_bounds,
         ),
     )

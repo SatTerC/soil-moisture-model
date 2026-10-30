@@ -31,7 +31,7 @@ Where older code disagrees with it, the document is right.
 - **Public names spell out the concept.**
   Dataclass fields, function arguments and output fields use the descriptive name from `docs/notation.md`, never a terse one.
 - **Locals inside function bodies may mirror the maths**, so dense expressions read like the equations:
-  lowercase per PEP 8 (`s_max`, `k_d`, `k_c`, `f_b`, `s_fc`), Greek spelled out (`beta`, `gamma`, `kappa`, `phi`), subscript labels as suffixes ($K_c$ → `k_c`).
+  lowercase per PEP 8 (`s_max`, `k_d`, `k_c`, `f_b`, `s_fc`), Greek spelled out (`gamma`, `kappa`, `phi`), subscript labels as suffixes ($K_c$ → `k_c`).
 - **"min" and "max"** are prefixes in public names (`max_runoff_fraction`) and suffixes in locals (`r_max`).
 - **Marks:** $\circ$ → `nominal_` prefix; $\mathrm{eff}$ → `_eff` suffix; $\mathrm{frz}$ → `frozen_` prefix; $S^{+}$ → `soil_moisture_after_infiltration`.
 - **$ET$** becomes `et` inside compound names (`reference_et_coefficient`, `potential_et`); public output fields spell out `evapotranspiration`.
@@ -66,7 +66,7 @@ Locals in `simulate` and the process functions that stand for a symbol.
 | $K_s$ | `k_s` | |
 | $k_d$, $k_d^{\mathrm{eff}}$ | `k_d`, `k_d_eff` | |
 | $r_{\max}$ | `r_max` | |
-| $\beta$ | `beta` | |
+| $(1 - p) S_{fc}$ | `stress_onset` | store below which $K_s < 1$ |
 | $f_B$ | `f_b` | |
 | $f_B\,I_{\max}$ | `interception_cap` | avoids shadowing the `interception_capacity` function |
 | — | `degree_day_reference_et` | import alias of `processes.reference_evapotranspiration`, which the `simulate` argument of that name shadows |

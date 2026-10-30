@@ -25,11 +25,11 @@ out.soil_moisture  # mm, shape (time, *space)
 This project uses [`uv`](https://docs.astral.sh/uv/) for package management and [`just`](https://just.systems/) as a command runner.
 
 ```sh
-uv sync            # install, including dev dependencies
-just lint          # format and lint
-just typecheck
-just test          # or `just test-cov`
-just docs          # build the documentation
+uv sync                # install, including dev dependencies
+uv run just lint       # format and lint
+uv run just typecheck
+uv run just test       # or `uv run just test-cov`
+uv run just docs       # build the documentation
 ```
 
 ### Regression fixtures

@@ -41,6 +41,11 @@ test = [
     "xarray>=2025.1",
 ]
 
+[tool.uv]
+# Only resolve releases at least a week old. Set here, not only in the user's
+# uv.toml, so CI resolves with the same option the lockfile records.
+exclude-newer = "1 week"
+
 [tool.ruff]
 line-length = 88
 indent-width = 4

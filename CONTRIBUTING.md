@@ -61,6 +61,7 @@ Locals in `simulate` and the process functions that stand for a symbol.
 | $ET_o$, $ET_o^{\mathrm{eff}}$ | `reference_et`, `reference_et_eff` | |
 | $ET_p$ | `potential_et` | |
 | $ET_a$ | `aet` | |
+| $ET_p - I$ | `demand_on_store` | |
 | $K_c$ | `k_c` | |
 | $K_s$ | `k_s` | |
 | $k_d$, $k_d^{\mathrm{eff}}$ | `k_d`, `k_d_eff` | |

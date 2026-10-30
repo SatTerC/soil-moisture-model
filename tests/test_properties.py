@@ -64,6 +64,15 @@ def test_evapotranspiration_bounded_by_demand_and_water(inputs):
 
 @SETTINGS
 @given(inputs=model_inputs())
+def test_total_evaporative_loss_bounded_by_demand(inputs):
+    out = simulate(**inputs)
+    assert np.all(
+        out.total_evaporative_loss <= out.potential_evapotranspiration + 1e-12
+    )
+
+
+@SETTINGS
+@given(inputs=model_inputs())
 def test_outputs_finite(inputs):
     out = simulate(**inputs)
     for name in ("soil_moisture", "actual_evapotranspiration", "runoff", "drainage"):

@@ -167,3 +167,26 @@ class TestSuppliedReferenceEvapotranspiration:
                 25.0,
                 reference_evapotranspiration=np.ones(10),
             )
+
+
+class TestInterception:
+    def test_no_interception_without_demand(self):
+        out = simulate([-5.0], [10.0], [1e6], 0.0, 25.0)
+        assert out.interception[0] == 0.0
+        assert out.throughfall[0] == 10.0
+
+    def test_limited_by_demand_and_reduces_it(self):
+        # Large biomass: interception capacity near its maximum, above demand.
+        out = simulate(
+            [10.0],
+            [50.0],
+            [1e6],
+            0.0,
+            25.0,
+            initial_soil_moisture=1000.0,
+            reference_evapotranspiration=[2.0],
+        )
+        et_p = out.potential_evapotranspiration[0]
+        assert et_p < C.max_interception_capacity
+        assert out.interception[0] == pytest.approx(et_p)
+        assert out.actual_evapotranspiration[0] == pytest.approx(0.0)

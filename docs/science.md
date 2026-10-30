@@ -37,14 +37,17 @@ $$
 
 All terms are weekly totals in mm.
 The model conserves water exactly: the test suite checks this identity every week.
+Evaporative losses are bounded by demand: $I + ET_a \le ET_p$.
 
 ### Interception and throughfall
 
-Intercepted precipitation is limited by an interception capacity $f_B\,I_{\max}$ that grows with biomass (see [Biomass effects](#biomass-effects)), and it evaporates within the week:
+Intercepted precipitation is limited by an interception capacity $f_B\,I_{\max}$ that grows with biomass (see [Biomass effects](#biomass-effects)), and by the potential evapotranspiration $ET_p$ (see [Evapotranspiration](#evapotranspiration)), and it evaporates within the week:
 
 $$
-I = \min(P, f_B\,I_{\max}), \qquad P_T = P - I
+I = \min(P,\ f_B\,I_{\max},\ ET_p), \qquad P_T = P - I
 $$
+
+Water the canopy holds but the week's demand cannot evaporate falls through to the soil, so a frozen week, with almost no demand, intercepts almost nothing.
 
 ### Runoff and infiltration
 
@@ -92,12 +95,13 @@ $$
 The superscript $\mathrm{eff}$ marks the values after the [frozen-week adjustment](#frozen-weeks); in an unfrozen week they equal the plain ones.
 In an unfrozen week $ET_p$ is `[FAO56]`'s crop evapotranspiration $ET_c = K_c\,ET_o$.
 
-Actual evapotranspiration is reduced by the water-stress coefficient $K_s$ and cannot exceed the store after infiltration:
+Evaporating intercepted water uses part of the demand, and the rest, $ET_p - I$, draws on the store.
+Actual evapotranspiration is that remaining demand reduced by the water-stress coefficient $K_s$, and cannot exceed the store after infiltration:
 
 $$
 K_s = \left(\frac{S^{+}_t}{S_{\max}}\right)^{\beta},
 \qquad
-ET_a = \min(K_s\, ET_p,\ S^{+}_t)
+ET_a = \min\left(K_s\, (ET_p - I),\ S^{+}_t\right)
 $$
 
 The stress exponent $\beta$ increases with clay content, so clay soils hold water more tightly.
@@ -210,7 +214,6 @@ The initial soil moisture $S_0$ is an argument of [`simulate`](API_Reference/mod
 ## Limitations
 
 - The built-in evaporative demand depends on temperature only: there is no radiation, humidity or wind, unless $ET_o$ is supplied.
-- Interception evaporates in full every week, regardless of evaporative demand.
 - Freezing is diagnosed from air temperature alone; there is no snowpack.
 - The single store has no vertical structure, so it cannot represent a wet surface over a dry subsoil.
 - The time step is fixed at one week.

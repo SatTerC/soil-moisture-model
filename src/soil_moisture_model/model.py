@@ -58,7 +58,8 @@ class SoilWaterOutput:
     r"""Biomass-dependent interception capacity, $f_B\, I_{\max}$ (mm per
     week)."""
     interception: NDArray[np.float64]
-    """Precipitation intercepted by the canopy and evaporated, $I$ (mm per
+    """Precipitation intercepted by the canopy and evaporated, at most the
+    interception capacity and the potential evapotranspiration, $I$ (mm per
     week)."""
     throughfall: NDArray[np.float64]
     """Precipitation reaching the soil surface, $P_T$ (mm per week)."""
@@ -77,7 +78,10 @@ class SoilWaterOutput:
 
     @property
     def total_evaporative_loss(self) -> NDArray[np.float64]:
-        """Actual evapotranspiration plus interception (mm per week)."""
+        """Actual evapotranspiration plus interception (mm per week).
+
+        At most the potential evapotranspiration, $ET_p$.
+        """
         return self.actual_evapotranspiration + self.interception
 
 
@@ -97,15 +101,15 @@ def simulate(
 
     Each week $t$, starting from store $S_{t-1}$:
 
-    1. Interception $I = \min(P, f_B I_{\max})$, throughfall $P_T = P - I$.
-    2. Surface runoff $Q_s = r_{\max} (S_{t-1}/S_{\max})^{\gamma} P_T$, or
+    1. Potential evapotranspiration $ET_p = K_c\, ET_o^{\mathrm{eff}}$.
+    2. Interception $I = \min(P, f_B I_{\max}, ET_p)$, throughfall $P_T = P - I$.
+    3. Surface runoff $Q_s = r_{\max} (S_{t-1}/S_{\max})^{\gamma} P_T$, or
        $(1 - \phi^{\mathrm{frz}}) P_T$ in a frozen week.
-    3. Saturation excess $Q_e = \max(S_{t-1} + P_T - Q_s - S_{\max}, 0)$ also
+    4. Saturation excess $Q_e = \max(S_{t-1} + P_T - Q_s - S_{\max}, 0)$ also
        runs off: total runoff $Q = Q_s + Q_e$, infiltration $F = P_T - Q$.
-    4. Store after infiltration $S^{+}_t = S_{t-1} + F \le S_{\max}$.
-    5. Water-stress coefficient $K_s = (S^{+}_t / S_{\max})^{\beta}$.
-    6. Potential evapotranspiration $ET_p = K_c\, ET_o^{\mathrm{eff}}$.
-    7. Actual evapotranspiration $ET_a = \min(K_s\, ET_p,\; S^{+}_t)$.
+    5. Store after infiltration $S^{+}_t = S_{t-1} + F \le S_{\max}$.
+    6. Water-stress coefficient $K_s = (S^{+}_t / S_{\max})^{\beta}$.
+    7. Actual evapotranspiration $ET_a = \min(K_s\, (ET_p - I),\; S^{+}_t)$.
     8. Drainage $D = k_d^{\mathrm{eff}} \max(S^{+}_t - ET_a - S_{fc}, 0)$, with
        field capacity $S_{fc} = \phi_{fc} S_{\max}$.
     9. $S_t = S^{+}_t - ET_a - D$.
@@ -198,8 +202,6 @@ def simulate(
     f_b = biomass_saturation(bio, params.biomass_half_saturation)
     k_c = crop_coefficient(f_b, c)
     interception_cap = interception_capacity(f_b, c)
-    interception = np.minimum(precip, interception_cap)
-    throughfall = precip - interception
 
     if supplied_et is None:
         reference_et = degree_day_reference_et(
@@ -211,6 +213,11 @@ def simulate(
         frozen, reference_et * c.frozen_reference_et_multiplier, reference_et
     )
     potential_et = reference_et_eff * k_c
+    # Intercepted water evaporates only as far as demand allows, and the energy
+    # it uses is not available to draw water from the store.
+    interception = np.minimum(np.minimum(precip, interception_cap), potential_et)
+    throughfall = precip - interception
+    demand_on_store = potential_et - interception
     k_d = soil.drainage_coefficient
     k_d_eff = np.where(frozen, k_d * c.frozen_drainage_multiplier, k_d)
 
@@ -237,7 +244,9 @@ def simulate(
             s_max, s + throughfall[t] - runoff[t]
         )
         k_s[t] = np.clip((soil_moisture_after_infiltration / s_max) ** beta, 0.0, 1.0)
-        aet[t] = np.minimum(potential_et[t] * k_s[t], soil_moisture_after_infiltration)
+        aet[t] = np.minimum(
+            demand_on_store[t] * k_s[t], soil_moisture_after_infiltration
+        )
         after_et = soil_moisture_after_infiltration - aet[t]
         drainage[t] = k_d_eff[t] * np.maximum(after_et - s_fc, 0.0)
         s = np.clip(after_et - drainage[t], 0.0, s_max)

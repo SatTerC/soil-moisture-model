@@ -69,7 +69,7 @@ Weekly totals, mm wk⁻¹, shape `(time, *space)`.
 | Concept | Math | Code | Note |
 |---|---|---|---|
 | precipitation | $P$ | `precipitation` | negative values are treated as zero |
-| interception | $I = \min(P, f_B I_{\max})$ | `interception` | evaporates within the week |
+| interception | $I = \min(P, f_B I_{\max}, ET_p)$ | `interception` | evaporates within the week |
 | throughfall | $P_T = P - I$ | `throughfall` | subscript $T$ is a label, not temperature |
 | surface runoff | $Q_s$ | — | |
 | saturation excess | $Q_e$ | — | |

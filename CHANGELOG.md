@@ -23,6 +23,12 @@ Refactors that leave outputs unchanged are not listed.
 
 ### Changed
 
+- **Interception is bounded by evaporative demand and uses part of it.**
+  Intercepted water evaporated in full every week, up to 3 mm, even in frozen weeks and weeks with no demand, and transpiration then drew on the full potential evapotranspiration as well.
+  Now $I = \min(P, f_B I_{\max}, ET_p)$, water the canopy holds but cannot evaporate falls through to the soil, and the store meets only the remaining demand: $ET_a = \min(K_s (ET_p - I), S^{+})$.
+  So $I + ET_a \le ET_p$, which a property test checks.
+  In `temperate_default`, total evaporative loss had exceeded potential evapotranspiration in 317 of 520 weeks; annual loss falls from 464 to 409 mm, with interception unchanged at 86 mm and actual evapotranspiration down from 379 to 323 mm.
+  In `cold_upland`, annual interception falls from 71 to 51 mm.
 - **The elevation multiplier on reference evapotranspiration now follows from atmospheric pressure.**
   It was $1 + 0.08\,z/1000$, clipped to [0.75, 1.35]: a fixed 8 % per kilometre.
   It is now the equilibrium evaporation factor $s / (s + \gamma_{\mathrm{psy}})$ relative to sea level, with pressure, psychrometric constant and vapour pressure slope from `[FAO56]` eqs. (7), (8) and (13).

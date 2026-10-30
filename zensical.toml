@@ -33,6 +33,7 @@ extra_css = [
 
 [project.theme]
 language = "en"
+custom_dir = "overrides"
 features = [
     "announce.dismiss",
     "content.code.annotate",
@@ -66,6 +67,8 @@ toggle.name = "Switch to light mode"
 # Extensions
 # ----------
 # see https://zensical.org/docs/setup/extensions/python-markdown-extensions/
+
+[project.markdown_extensions.admonition]
 
 [project.markdown_extensions.pymdownx.arithmatex]
 generic = true

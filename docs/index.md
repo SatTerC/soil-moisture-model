@@ -5,15 +5,17 @@ icon: lucide/house
 
 # Soil Moisture Model
 
-A reduced-complexity, weekly bucket model of soil moisture.
-It needs only weekly air temperature, precipitation and plant biomass, plus a site's elevation and soil clay content.
-Each week it partitions precipitation into canopy interception, runoff, evapotranspiration, drainage and storage in a single soil water store.
+A very simple bucket model of soil moisture, which partitions precipitation (weekly totals) into canopy interception, runoff, evapotranspiration, drainage and storage in a single soil water store.
 
-The model is a component of the [SatTerC](https://github.com/SatTerC/satterc) terrestrial carbon modelling framework.
-There it runs downstream of [SGAM](https://github.com/SatTerC/sgam), which supplies weekly plant biomass.
-It can also be used on its own.
+- Drivers: air temperature, precipitation and plant biomass at weekly resolution.
+- Site-specific parameters: elevation, soil clay content.
 
-The model is written in plain numpy and vectorised over space: a whole block of pixels, each with its own parameters, runs in one call, and only the time dimension is looped over.
+The model is intended as a component of the [SatTerC](https://github.com/SatTerC/satterc) terrestrial carbon modelling framework.
+It is written in plain numpy and vectorised over space.
+
+!!! warning "Not scientifically validated"
+
+    This model has not been scientifically validated and should not be used at this stage.
 
 - [Science](science.md): the model's processes and equations.
 - [API Reference](API_Reference/model.md): every function and class.
@@ -34,7 +36,7 @@ The model is written in plain numpy and vectorised over space: a whole block of 
 
 ## Quickstart
 
-Drivers are arrays whose first axis is time, in weeks.
+Drivers are numpy arrays whose first axis is time, in weeks.
 Site inputs and parameters broadcast against the remaining (spatial) axes.
 
 ```python

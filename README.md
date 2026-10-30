@@ -3,6 +3,9 @@
 A reduced-complexity, weekly bucket model of soil moisture, driven by air temperature, precipitation and plant biomass, with site elevation and soil clay content.
 It is written in plain numpy, vectorised over space, and designed as a component of the [SatTerC](https://github.com/SatTerC/satterc) framework.
 
+> [!WARNING]
+> **Not scientifically validated.** This model has not been scientifically validated and should not be used at this stage.
+
 Documentation, including the model's equations: https://SatTerC.github.io/soil-moisture-model
 
 ## Installation

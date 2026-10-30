@@ -16,9 +16,13 @@
 
 For each ICOS ecosystem station of a selected vegetation type, this script
 fits the model's parameters, the initial soil water store and a LAI-to-biomass
-multiplier by minimising the RMSE between simulated soil moisture and weekly
-mean observed soil water content (FLUXNET ``SWC_F_MDS_1``), using
-`scipy.optimize.dual_annealing`.
+multiplier by minimising the RMSE between simulated soil water content and
+weekly mean observed soil water content (FLUXNET ``SWC_F_MDS_1``, converted from
+percent to m3 m-3), using `scipy.optimize.dual_annealing`.
+
+The simulated content is the mean over the rooting depth, while ``SWC_F_MDS_1``
+is usually measured near the surface, so the two are not the same quantity; a
+fit can absorb the difference into the rooting depth.
 
 Observed data: ICOS ETC L2 archive, https://doi.org/10.18160/R3G6-Z8ZH.
 
@@ -40,8 +44,6 @@ Usage
 -----
     uv run scripts/calibrate_icos.py --help
 
-TODO: the objective compares soil moisture in mm with SWC in volumetric percent.
-See the science review issue before relying on calibrated values.
 """
 
 import argparse
@@ -55,6 +57,7 @@ import xarray as xr
 from scipy.optimize import dual_annealing
 
 from soil_moisture_model import SoilWaterOutput, SoilWaterParams, simulate
+from soil_moisture_model.processes import soil_properties
 
 SITE_TYPES = (
     "croplands",
@@ -70,9 +73,10 @@ SITE_TYPES = (
 )
 
 # Search bounds of the calibrated quantities. The first entry is the initial
-# store; the rest are SoilWaterParams fields.
+# store as a fraction of the soil water capacity, which depends on the rooting
+# depth; the rest are SoilWaterParams fields.
 PARAM_BOUNDS: dict[str, tuple[float, float]] = {
-    "initial_soil_moisture": (5.0, 250.0),
+    "initial_relative_soil_moisture": (0.05, 1.0),
     "drainage_coefficient": (0.01, 0.30),
     "max_runoff_fraction": (0.02, 0.95),
     "runoff_exponent": (0.5, 4.0),
@@ -94,13 +98,15 @@ DEFAULT_LAI_TO_BIOMASS_BOUNDS = (50.0, 400.0)
 
 MIN_MATCHED_WEEKS = 20
 SWC_MISSING = -9999
+# No organic matter in the input files; this is the model's default.
+DEFAULT_ORGANIC_MATTER = 0.025
 
 
 def unpack(x: Sequence[float]) -> tuple[SoilWaterParams, float, float]:
-    """Split an optimiser vector into (params, initial store, LAI multiplier)."""
+    """Split an optimiser vector into params, initial store and LAI multiplier."""
     names = list(PARAM_BOUNDS)
     values = dict(zip(names, map(float, x[: len(names)]), strict=True))
-    initial = values.pop("initial_soil_moisture")
+    initial = values.pop("initial_relative_soil_moisture")
     return SoilWaterParams(**values), initial, float(x[len(names)])
 
 
@@ -159,13 +165,15 @@ def run(
 ) -> SoilWaterOutput:
     """Run the model for one site from an optimiser vector."""
     params, initial, lai_to_biomass = unpack(x)
+    soil = soil_properties(*texture, DEFAULT_ORGANIC_MATTER, params)
     return simulate(
         drivers["temperature"],
         drivers["precipitation"],
         drivers["lai"] * lai_to_biomass,
         elevation,
         *texture,
-        initial_soil_moisture=initial,
+        organic_matter=DEFAULT_ORGANIC_MATTER,
+        initial_soil_moisture=initial * soil.soil_water_capacity,
         params=params,
     )
 
@@ -177,17 +185,17 @@ def make_objective(
     elevation: float,
     texture: tuple[float, float],
 ) -> Callable[[np.ndarray], float]:
-    """Return the RMSE objective between simulated soil moisture and SWC.
+    """Return the RMSE objective between simulated soil water content and SWC.
 
     Weeks are matched on their timestamps once, up front. The objective is
     infinite if fewer than `MIN_MATCHED_WEEKS` weeks have both values.
     """
-    obs = swc.reindex(time).to_numpy()
+    obs = swc.reindex(time).to_numpy() / 100.0  # percent to m3 m-3
     matched = np.isfinite(obs)
     obs = obs[matched]
 
     def objective(x: np.ndarray) -> float:
-        sim = run(drivers, elevation, texture, x).soil_moisture[matched]
+        sim = run(drivers, elevation, texture, x).soil_water_content[matched]
         ok = np.isfinite(sim)
         if ok.sum() < MIN_MATCHED_WEEKS:
             return np.inf
@@ -237,7 +245,7 @@ def calibrate_site(
         "plant_type": plant_type,
         "calib_rmse": float(opt.fun),
         "lai_to_biomass_multiplier": lai_to_biomass,
-        "initial_soil_moisture": initial,
+        "initial_relative_soil_moisture": initial,
         **params.as_dict(),
     }
     return results.reset_index(), record

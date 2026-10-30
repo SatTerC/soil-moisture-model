@@ -92,7 +92,8 @@ def test_calibrates_and_resumes(calibrate, tmp_path, capsys):
     best = pd.read_parquet(tmp_path / "best_params_by_site.parquet")
     results = pd.read_parquet(tmp_path / "results_all_sites.parquet")
     assert list(best.index) == ["BE-Xxx"]  # DE-Yyy has no SWC, FR-Zzz is filtered out
-    assert np.isfinite(best.loc["BE-Xxx", "calib_rmse"])
+    # Water content in m3 m-3 against SWC / 100: the error is a fraction, not mm.
+    assert 0.0 < best.loc["BE-Xxx", "calib_rmse"] < 0.3
     assert len(results) == N_WEEKS
     assert "Failed sites: 1" in capsys.readouterr().out
 

@@ -75,6 +75,9 @@ $$
 
 where $T$ is weekly mean air temperature (°C), $T_b$ the base temperature, $c_{ET}$ the calibrated reference ET coefficient (mm °C⁻¹ day⁻¹), $z$ the elevation (m), $g_z$ the elevation gradient (per km) and $m_z$ the elevation multiplier.
 
+Alternatively, $ET_o$ can be passed to `simulate` directly, from any method that uses more than temperature, such as `[FAO56]` Penman–Monteith.
+The degree-day relation, and with it the elevation multiplier and $c_{ET}$, is then not used.
+
 Potential evapotranspiration applies the crop coefficient $K_c$, which rises with biomass:
 
 $$
@@ -201,7 +204,7 @@ The initial soil moisture $S_0$ is an argument of [`simulate`](API_Reference/mod
 
 ## Limitations
 
-- Evaporative demand depends on temperature only: there is no radiation, humidity or wind.
+- The built-in evaporative demand depends on temperature only: there is no radiation, humidity or wind, unless $ET_o$ is supplied.
 - Interception evaporates in full every week, regardless of evaporative demand.
 - Freezing is diagnosed from air temperature alone; there is no snowpack.
 - The single store has no vertical structure, so it cannot represent a wet surface over a dry subsoil.

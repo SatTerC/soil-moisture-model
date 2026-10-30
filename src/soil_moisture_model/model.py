@@ -25,9 +25,9 @@ from .processes import (
     biomass_saturation,
     crop_coefficient,
     interception_capacity,
-    reference_evapotranspiration,
     soil_properties,
 )
+from .processes import reference_evapotranspiration as degree_day_reference_et
 
 
 @dataclass(frozen=True)
@@ -89,6 +89,7 @@ def simulate(
     clay: ArrayLike,
     *,
     initial_soil_moisture: ArrayLike = 50.0,
+    reference_evapotranspiration: ArrayLike | None = None,
     params: SoilWaterParams | None = None,
     constants: ModelConstants | None = None,
 ) -> SoilWaterOutput:
@@ -131,6 +132,13 @@ def simulate(
         Initial soil moisture, before the first week, $S_0$ (mm), broadcastable
         to ``space``.
         Clipped to the soil water capacity.
+    reference_evapotranspiration
+        Weekly reference evapotranspiration, $ET_o$ (mm), shape
+        ``(time, *space)``, from any method, such as `[FAO56]` Penman-Monteith.
+        Replaces the degree-day relation, so `elevation` and
+        `SoilWaterParams.reference_et_coefficient` are then unused. The
+        frozen-week adjustment still applies. Negative values are treated as
+        zero.
     params
         Calibrated parameters. Defaults to `SoilWaterParams()`.
     constants
@@ -158,20 +166,24 @@ def simulate(
     temp = np.asarray(temperature, dtype=float)
     precip = np.maximum(np.asarray(precipitation, dtype=float), 0.0)
     bio = np.asarray(biomass, dtype=float)
-    if temp.ndim == 0 or precip.ndim == 0 or bio.ndim == 0:
+    supplied_et = (
+        None
+        if reference_evapotranspiration is None
+        else np.maximum(np.asarray(reference_evapotranspiration, dtype=float), 0.0)
+    )
+    drivers = [x for x in (temp, precip, bio, supplied_et) if x is not None]
+    if any(x.ndim == 0 for x in drivers):
         raise ValueError("drivers must have a leading time dimension")
     n_time = temp.shape[0]
-    if precip.shape[0] != n_time or bio.shape[0] != n_time:
+    if any(x.shape[0] != n_time for x in drivers):
         raise ValueError(
             "drivers must share their leading (time) dimension, got "
-            f"{temp.shape}, {precip.shape} and {bio.shape}"
+            + ", ".join(str(x.shape) for x in drivers)
         )
 
     soil = soil_properties(clay, params, c)
     space = np.broadcast_shapes(
-        temp.shape[1:],
-        precip.shape[1:],
-        bio.shape[1:],
+        *(x.shape[1:] for x in drivers),
         np.shape(elevation),
         np.shape(initial_soil_moisture),
         np.shape(soil.soil_water_capacity),
@@ -189,9 +201,12 @@ def simulate(
     interception = np.minimum(precip, interception_cap)
     throughfall = precip - interception
 
-    reference_et = reference_evapotranspiration(
-        temp, elevation, params.reference_et_coefficient, c
-    )
+    if supplied_et is None:
+        reference_et = degree_day_reference_et(
+            temp, elevation, params.reference_et_coefficient, c
+        )
+    else:
+        reference_et = np.broadcast_to(supplied_et, shape).copy()
     reference_et_eff = np.where(
         frozen, reference_et * c.frozen_reference_et_multiplier, reference_et
     )

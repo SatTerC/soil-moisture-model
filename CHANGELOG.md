@@ -5,6 +5,13 @@ Refactors that leave outputs unchanged are not listed.
 
 ## Unreleased
 
+### Added
+
+- **`simulate` accepts reference evapotranspiration as an optional input.**
+  `reference_evapotranspiration`, shape `(time, *space)` in mm per week, replaces the degree-day relation, so demand can come from a method with radiation and humidity, such as `[FAO56]` Penman–Monteith, or be shared with another model, such as pyrealm's SPLASH.
+  The frozen-week adjustment still applies.
+  Outputs are unchanged when it is not given.
+
 ### Removed
 
 - **The uptake factor no longer multiplies potential evapotranspiration.**

@@ -68,5 +68,6 @@ Locals in `simulate` and the process functions that stand for a symbol.
 | $\beta$ | `beta` | |
 | $f_B$ | `f_b` | |
 | $f_B\,I_{\max}$ | `interception_cap` | avoids shadowing the `interception_capacity` function |
+| — | `degree_day_reference_et` | import alias of `processes.reference_evapotranspiration`, which the `simulate` argument of that name shadows |
 | $\Delta$ | `delta` | |
 | $T$ | `temp` | never `t` |

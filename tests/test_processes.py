@@ -96,3 +96,61 @@ def test_frozen_week_routes_most_throughfall_to_runoff():
     out = simulate([-5.0], [100.0], [0.0], 0.0, 25.0, initial_soil_moisture=0.0)
     assert out.frozen[0]
     assert out.runoff[0] == pytest.approx((1 - C.frozen_infiltration_fraction) * 100.0)
+
+
+class TestSuppliedReferenceEvapotranspiration:
+    rng = np.random.default_rng(0)
+    temp = rng.normal(8.0, 8.0, 104)
+    precip = rng.gamma(1.5, 12.0, 104)
+    biomass = np.full(104, 200.0)
+
+    def test_degree_day_values_reproduce_default_run(self):
+        default = simulate(self.temp, self.precip, self.biomass, 300.0, 25.0)
+        supplied = simulate(
+            self.temp,
+            self.precip,
+            self.biomass,
+            300.0,
+            25.0,
+            reference_evapotranspiration=default.reference_evapotranspiration,
+        )
+        np.testing.assert_array_equal(supplied.soil_moisture, default.soil_moisture)
+
+    def test_replaces_degree_days_and_ignores_elevation(self):
+        et_o = np.full(104, 20.0)
+        low, high = (
+            simulate(
+                self.temp,
+                self.precip,
+                self.biomass,
+                z,
+                25.0,
+                reference_evapotranspiration=et_o,
+            )
+            for z in (0.0, 3000.0)
+        )
+        np.testing.assert_array_equal(low.soil_moisture, high.soil_moisture)
+        thawed = ~low.frozen
+        np.testing.assert_allclose(
+            low.potential_evapotranspiration[thawed],
+            low.crop_coefficient[thawed] * 20.0,
+        )
+
+    def test_frozen_adjustment_still_applies(self):
+        out = simulate(
+            [-5.0], [0.0], [200.0], 0.0, 25.0, reference_evapotranspiration=[10.0]
+        )
+        assert out.potential_evapotranspiration[0] == pytest.approx(
+            C.frozen_reference_et_multiplier * out.crop_coefficient[0] * 10.0
+        )
+
+    def test_time_dimension_must_match(self):
+        with pytest.raises(ValueError, match="leading"):
+            simulate(
+                self.temp,
+                self.precip,
+                self.biomass,
+                0.0,
+                25.0,
+                reference_evapotranspiration=np.ones(10),
+            )

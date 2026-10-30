@@ -54,7 +54,7 @@ Weekly totals, mm wk⁻¹, shape `(time, *space)`, except the coefficients, whic
 
 | Concept | Math | Code | Note |
 |---|---|---|---|
-| reference evapotranspiration | $ET_o$ | `reference_evapotranspiration` | `[FAO56]`; letter o, not zero |
+| reference evapotranspiration | $ET_o$ | `reference_evapotranspiration` | `[FAO56]`; letter o, not zero; also an optional input to `simulate` |
 | potential evapotranspiration | $ET_p = K_c\,ET_o^{\mathrm{eff}}$ | `potential_evapotranspiration` | |
 | actual evapotranspiration | $ET_a$ | `actual_evapotranspiration` | |
 | crop coefficient | $K_c$ | `crop_coefficient` | `[FAO56]` |

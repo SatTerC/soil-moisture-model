@@ -109,9 +109,6 @@ class ModelConstants:
     max_interception_capacity: float = 3.0
     r"""Interception capacity approached as biomass becomes large, $I_{\max}$
     (mm per week)."""
-    max_uptake_factor: float = 1.35
-    r"""Uptake factor approached as biomass becomes large, $u_{\max}$
-    (dimensionless)."""
 
     # --- Frozen weeks ---
     freezing_temperature: float = 0.0
@@ -123,9 +120,6 @@ class ModelConstants:
     frozen_drainage_multiplier: float = 0.25
     r"""Multiplier on the drainage coefficient in a frozen week,
     $m^{\mathrm{frz}}_{d}$ (dimensionless)."""
-    frozen_uptake_multiplier: float = 0.30
-    r"""Multiplier on the biomass-driven part of the uptake factor, $u - 1$, in a
-    frozen week, $m^{\mathrm{frz}}_{u}$ (dimensionless)."""
     frozen_reference_et_multiplier: float = 0.20
     r"""Multiplier on reference evapotranspiration in a frozen week,
     $m^{\mathrm{frz}}_{ET}$ (dimensionless)."""

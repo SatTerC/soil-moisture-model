@@ -63,7 +63,6 @@ Locals in `simulate` and the process functions that stand for a symbol.
 | $ET_a$ | `aet` | |
 | $K_c$ | `k_c` | |
 | $K_s$ | `k_s` | |
-| $u^{\mathrm{eff}}$ | `u_eff` | |
 | $k_d$, $k_d^{\mathrm{eff}}$ | `k_d`, `k_d_eff` | |
 | $r_{\max}$ | `r_max` | |
 | $\beta$ | `beta` | |

@@ -5,8 +5,8 @@ Each week, precipitation is split into canopy interception and throughfall;
 throughfall is split into runoff and infiltration; evapotranspiration is drawn
 from the store, limited by the water-stress coefficient; and water above field
 capacity drains. Frozen weeks (weekly mean air temperature below
-`ModelConstants.freezing_temperature`) infiltrate less and evaporate, take up and
-drain more slowly.
+`ModelConstants.freezing_temperature`) infiltrate less, and evaporate and drain
+more slowly.
 
 The drivers are time-leading arrays of shape ``(time, *space)``. Site inputs and
 every field of `SoilWaterParams` broadcast against ``space``, so a whole block
@@ -27,7 +27,6 @@ from .processes import (
     interception_capacity,
     reference_evapotranspiration,
     soil_properties,
-    uptake_factor,
 )
 
 
@@ -48,16 +47,13 @@ class SoilWaterOutput:
     week)."""
     potential_evapotranspiration: NDArray[np.float64]
     r"""Evapotranspiration if soil moisture were not limiting: effective reference
-    evapotranspiration times crop coefficient times effective uptake factor,
-    $ET_p = u^{\mathrm{eff}} K_c\, ET_o^{\mathrm{eff}}$ (mm per week)."""
+    evapotranspiration times crop coefficient, $ET_p = K_c\, ET_o^{\mathrm{eff}}$
+    (mm per week)."""
     reference_evapotranspiration: NDArray[np.float64]
     """Temperature- and elevation-driven evaporative demand, before the
     frozen-week adjustment, $ET_o$ (mm per week)."""
     crop_coefficient: NDArray[np.float64]
     """Biomass-dependent crop coefficient, $K_c$ (dimensionless)."""
-    uptake_factor: NDArray[np.float64]
-    """Biomass-dependent uptake factor, before the frozen-week adjustment, $u$
-    (dimensionless)."""
     interception_capacity: NDArray[np.float64]
     r"""Biomass-dependent interception capacity, $f_B\, I_{\max}$ (mm per
     week)."""
@@ -107,15 +103,14 @@ def simulate(
        runs off: total runoff $Q = Q_s + Q_e$, infiltration $F = P_T - Q$.
     4. Store after infiltration $S^{+}_t = S_{t-1} + F \le S_{\max}$.
     5. Water-stress coefficient $K_s = (S^{+}_t / S_{\max})^{\beta}$.
-    6. Potential evapotranspiration $ET_p = u^{\mathrm{eff}} K_c\, ET_o^{\mathrm{eff}}$.
+    6. Potential evapotranspiration $ET_p = K_c\, ET_o^{\mathrm{eff}}$.
     7. Actual evapotranspiration $ET_a = \min(K_s\, ET_p,\; S^{+}_t)$.
     8. Drainage $D = k_d^{\mathrm{eff}} \max(S^{+}_t - ET_a - S_{fc}, 0)$, with
        field capacity $S_{fc} = \phi_{fc} S_{\max}$.
     9. $S_t = S^{+}_t - ET_a - D$.
 
     In an unfrozen week the effective values equal the plain ones. In a frozen
-    week, $ET_o^{\mathrm{eff}} = m^{\mathrm{frz}}_{ET} ET_o$,
-    $u^{\mathrm{eff}} = 1 + m^{\mathrm{frz}}_{u} (u - 1)$ and
+    week, $ET_o^{\mathrm{eff}} = m^{\mathrm{frz}}_{ET} ET_o$ and
     $k_d^{\mathrm{eff}} = m^{\mathrm{frz}}_{d} k_d$.
 
     Parameters
@@ -190,7 +185,6 @@ def simulate(
     frozen = temp < c.freezing_temperature
     f_b = biomass_saturation(bio, params.biomass_half_saturation)
     k_c = crop_coefficient(f_b, c)
-    u = uptake_factor(f_b, c)
     interception_cap = interception_capacity(f_b, c)
     interception = np.minimum(precip, interception_cap)
     throughfall = precip - interception
@@ -201,8 +195,7 @@ def simulate(
     reference_et_eff = np.where(
         frozen, reference_et * c.frozen_reference_et_multiplier, reference_et
     )
-    u_eff = np.where(frozen, 1.0 + (u - 1.0) * c.frozen_uptake_multiplier, u)
-    potential_et = reference_et_eff * k_c * u_eff
+    potential_et = reference_et_eff * k_c
     k_d = soil.drainage_coefficient
     k_d_eff = np.where(frozen, k_d * c.frozen_drainage_multiplier, k_d)
 
@@ -242,7 +235,6 @@ def simulate(
         potential_evapotranspiration=potential_et,
         reference_evapotranspiration=reference_et,
         crop_coefficient=k_c,
-        uptake_factor=u,
         interception_capacity=interception_cap,
         interception=interception,
         throughfall=throughfall,

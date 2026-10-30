@@ -96,32 +96,6 @@ def interception_capacity(
     )
 
 
-def uptake_factor(
-    biomass_saturation: ArrayLike, constants: ModelConstants = DEFAULT_CONSTANTS
-) -> NDArray:
-    r"""Return the uptake factor, a multiplier on potential evapotranspiration.
-
-    $$
-    u = 1 + (u_{\max} - 1)\, f_B
-    $$
-
-    Parameters
-    ----------
-    biomass_saturation
-        Biomass saturation, $f_B$; see `biomass_saturation`.
-    constants
-        Supplies `max_uptake_factor`, $u_{\max}$.
-
-    Returns
-    -------
-    NDArray
-        Uptake factor, $u$ (dimensionless).
-    """
-    return 1.0 + (constants.max_uptake_factor - 1.0) * np.asarray(
-        biomass_saturation, float
-    )
-
-
 def elevation_et_multiplier(
     elevation: ArrayLike, constants: ModelConstants = DEFAULT_CONSTANTS
 ) -> NDArray:
@@ -161,8 +135,8 @@ def reference_evapotranspiration(
     ET_o = c_{ET} \cdot 7 \max(T - T_b, 0) \cdot m_z
     $$
 
-    This is the evaporative demand before the frozen-week adjustment, the crop
-    coefficient and the uptake factor are applied.
+    This is the evaporative demand before the frozen-week adjustment and the
+    crop coefficient are applied.
 
     Parameters
     ----------

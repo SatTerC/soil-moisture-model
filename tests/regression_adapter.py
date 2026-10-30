@@ -38,7 +38,6 @@ def run_scenario(inputs: dict) -> dict[str, np.ndarray]:
     return {
         "base_pet_mm": out.reference_evapotranspiration,
         "kc": out.crop_coefficient,
-        "biomass_uptake_factor": out.uptake_factor,
         "interception_capacity_mm": out.interception_capacity,
         "intercepted_mm": out.interception,
         "throughfall_mm": out.throughfall,

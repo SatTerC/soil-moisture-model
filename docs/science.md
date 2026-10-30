@@ -13,7 +13,7 @@ Symbols and terms follow [Notation](notation.md).
 Three things set the store's behaviour:
 
 - **Soil texture.** Clay content changes the soil water capacity, drainage, runoff and the shape of the water-stress response.
-- **Vegetation.** Plant biomass controls canopy interception, the crop coefficient and the uptake factor.
+- **Vegetation.** Plant biomass controls canopy interception and the crop coefficient.
 - **Climate.** Temperature drives evaporative demand and decides whether a week is frozen; precipitation supplies water.
 
 ```mermaid
@@ -75,14 +75,14 @@ $$
 
 where $T$ is weekly mean air temperature (°C), $T_b$ the base temperature, $c_{ET}$ the calibrated reference ET coefficient (mm °C⁻¹ day⁻¹), $z$ the elevation (m), $g_z$ the elevation gradient (per km) and $m_z$ the elevation multiplier.
 
-Potential evapotranspiration applies the crop coefficient $K_c$ and the uptake factor $u$, both of which rise with biomass:
+Potential evapotranspiration applies the crop coefficient $K_c$, which rises with biomass:
 
 $$
-ET_p = u^{\mathrm{eff}} K_c\, ET_o^{\mathrm{eff}}
+ET_p = K_c\, ET_o^{\mathrm{eff}}
 $$
 
 The superscript $\mathrm{eff}$ marks the values after the [frozen-week adjustment](#frozen-weeks); in an unfrozen week they equal the plain ones.
-$ET_p$ is not `[FAO56]`'s crop evapotranspiration $ET_c = K_c\,ET_o$, because of the uptake factor.
+In an unfrozen week $ET_p$ is `[FAO56]`'s crop evapotranspiration $ET_c = K_c\,ET_o$.
 
 Actual evapotranspiration is reduced by the water-stress coefficient $K_s$ and cannot exceed the store after infiltration:
 
@@ -120,9 +120,7 @@ Each effect then rises linearly in $f_B$, from its bare-soil value at $B = 0$ to
 $$
 K_c = K_{c,\min} + (K_{c,\max} - K_{c,\min}) f_B,
 \qquad
-\text{interception capacity} = f_B\,I_{\max},
-\qquad
-u = 1 + (u_{\max} - 1) f_B
+\text{interception capacity} = f_B\,I_{\max}
 $$
 
 ## Clay effects
@@ -155,12 +153,10 @@ A week is frozen when its mean air temperature is below the freezing temperature
 In a frozen week:
 
 - only a fraction $\phi^{\mathrm{frz}}$ of throughfall infiltrates, and the rest runs off, so $Q_s = (1 - \phi^{\mathrm{frz}}) P_T$;
-- reference evapotranspiration, the biomass-driven part of the uptake factor, and the drainage coefficient are each scaled down by a fixed multiplier:
+- reference evapotranspiration and the drainage coefficient are each scaled down by a fixed multiplier:
 
 $$
 ET_o^{\mathrm{eff}} = m^{\mathrm{frz}}_{ET}\, ET_o,
-\qquad
-u^{\mathrm{eff}} = 1 + m^{\mathrm{frz}}_{u} (u - 1),
 \qquad
 k_d^{\mathrm{eff}} = m^{\mathrm{frz}}_{d}\, k_d
 $$

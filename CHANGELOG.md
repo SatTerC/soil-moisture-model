@@ -5,6 +5,15 @@ Refactors that leave outputs unchanged are not listed.
 
 ## Unreleased
 
+### Removed
+
+- **The uptake factor no longer multiplies potential evapotranspiration.**
+  Potential evapotranspiration is now $ET_p = K_c\,ET_o^{\mathrm{eff}}$, `[FAO56]`'s crop evapotranspiration $ET_c$ in an unfrozen week.
+  The uptake factor $u$ (up to 1.35) had no `[FAO56]` counterpart and stacked on a crop coefficient that already reaches 1.2, inflating demand by up to 62 % over reference ET.
+  Removed with it: `ModelConstants.max_uptake_factor`, `ModelConstants.frozen_uptake_multiplier`, `processes.uptake_factor` and `SoilWaterOutput.uptake_factor`.
+  The plant effect that the factor stood for, how far roots reach into the soil, enters `[FAO56]` through rooting depth and the depletion fraction, which come in a later change.
+  In `temperate_default`, annual potential evapotranspiration falls from 2166 to 1760 mm, but actual evapotranspiration only from 705 to 682 mm, because water stress was already doing most of the limiting.
+
 ### Changed
 
 - **Bucket overflow is now runoff.**

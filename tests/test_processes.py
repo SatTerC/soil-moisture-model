@@ -11,7 +11,6 @@ from soil_moisture_model.processes import (
     interception_capacity,
     reference_evapotranspiration,
     soil_properties,
-    uptake_factor,
 )
 
 C = ModelConstants()
@@ -39,7 +38,6 @@ def test_biomass_effects_span_their_ranges():
     np.testing.assert_allclose(
         interception_capacity(f), [0.0, C.max_interception_capacity]
     )
-    np.testing.assert_allclose(uptake_factor(f), [1.0, C.max_uptake_factor])
 
 
 class TestElevation:

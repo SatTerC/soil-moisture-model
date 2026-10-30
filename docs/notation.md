@@ -30,7 +30,7 @@ The Avoid column lists synonyms not used here, usually because they mean somethi
 | Concept | Term | Avoid | Note |
 |---|---|---|---|
 | Temperature- and elevation-driven evaporative demand | reference evapotranspiration | PET, base PET | `[FAO56]` $ET_o$ |
-| Reference ET times crop coefficient times uptake factor | potential evapotranspiration | PET | |
+| Effective reference ET times crop coefficient | potential evapotranspiration | PET | `[FAO56]` $ET_c$ in an unfrozen week |
 | Water drawn from the store by evapotranspiration | actual evapotranspiration | AET, ET (unqualified) | |
 | Reduction factor on evapotranspiration, 1 meaning unstressed | water-stress coefficient | water stress, stress factor | `[FAO56]` $K_s$ |
 | Biomass-dependent multiplier on reference ET | crop coefficient | | `[FAO56]` $K_c$ |
@@ -39,7 +39,6 @@ The Avoid column lists synonyms not used here, usually because they mean somethi
 | Store at field capacity as a fraction of the soil water capacity | field-capacity fraction | field capacity (for the fraction) | field capacity itself is the store $S_{fc}$ |
 | Fraction of water above field capacity drained per week | drainage coefficient | drainage rate | |
 | Saturating function of biomass that scales every biomass effect | biomass saturation | biomass fraction | |
-| Multiplier on potential evapotranspiration from root uptake | uptake factor | root-uptake multiplier | |
 | Week whose mean air temperature is below the freezing temperature | frozen week | freeze–thaw | there is no frozen-soil state |
 | A quantity after the frozen-week adjustment | effective | adjusted, corrected | |
 | Temperature above which degree-days accumulate | base temperature | threshold temperature | |
@@ -56,7 +55,7 @@ Weekly totals, mm wk⁻¹, shape `(time, *space)`, except the coefficients, whic
 | Concept | Math | Code | Note |
 |---|---|---|---|
 | reference evapotranspiration | $ET_o$ | `reference_evapotranspiration` | `[FAO56]`; letter o, not zero |
-| potential evapotranspiration | $ET_p = u^{\mathrm{eff}} K_c\,ET_o^{\mathrm{eff}}$ | `potential_evapotranspiration` | |
+| potential evapotranspiration | $ET_p = K_c\,ET_o^{\mathrm{eff}}$ | `potential_evapotranspiration` | |
 | actual evapotranspiration | $ET_a$ | `actual_evapotranspiration` | |
 | crop coefficient | $K_c$ | `crop_coefficient` | `[FAO56]` |
 | water-stress coefficient | $K_s$ | `water_stress_coefficient` | `[FAO56]`; $0 \le K_s \le 1$; not saturated hydraulic conductivity |
@@ -125,7 +124,6 @@ Dimensionless and shape `(time, *space)`, except where noted.
 | biomass half-saturation | $K_B$ | `biomass_half_saturation` | g C m⁻², shape `space` |
 | biomass saturation | $f_B = B / (B + K_B)$ | `biomass_saturation` | $0 \le f_B < 1$ |
 | crop coefficient limits | $K_{c,\min}$, $K_{c,\max}$ | `min_crop_coefficient`, `max_crop_coefficient` | |
-| uptake factor | $u = 1 + (u_{\max} - 1) f_B$ | `uptake_factor` | |
 | interception capacity | $f_B\,I_{\max}$ | `interception_capacity` | mm wk⁻¹; deliberately no symbol of its own |
 | interception capacity limit | $I_{\max}$ | `max_interception_capacity` | mm wk⁻¹ |
 
@@ -141,8 +139,8 @@ Dimensionless and shape `(time, *space)`, except where noted.
 | elevation multiplier | $m_z$, bounds $m_{z,\min}$, $m_{z,\max}$ | `elevation_et_multiplier`, `elevation_et_multiplier_bounds` | |
 | elevation gradient | $g_z$ | `elevation_et_gradient` | per km |
 | frozen infiltration fraction | $\phi^{\mathrm{frz}}$ | `frozen_infiltration_fraction` | |
-| frozen multipliers | $m^{\mathrm{frz}}_{ET}$, $m^{\mathrm{frz}}_{u}$, $m^{\mathrm{frz}}_{d}$ | `frozen_reference_et_multiplier`, `frozen_uptake_multiplier`, `frozen_drainage_multiplier` | scale $ET_o$, $u - 1$ and $k_d$ |
-| effective (frozen-adjusted) values | $ET_o^{\mathrm{eff}}$, $u^{\mathrm{eff}}$, $k_d^{\mathrm{eff}}$ | suffix `_eff` | equal the plain value in unfrozen weeks |
+| frozen multipliers | $m^{\mathrm{frz}}_{ET}$, $m^{\mathrm{frz}}_{d}$ | `frozen_reference_et_multiplier`, `frozen_drainage_multiplier` | scale $ET_o$ and $k_d$ |
+| effective (frozen-adjusted) values | $ET_o^{\mathrm{eff}}$, $k_d^{\mathrm{eff}}$ | suffix `_eff` | equal the plain value in unfrozen weeks |
 
 Clip bounds have no symbols; they are named only in `ModelConstants` and written $\mathrm{clip}(\cdot)$.
 
@@ -151,7 +149,7 @@ Clip bounds have no symbols; they are named only in `ModelConstants` and written
 | Mark | Meaning | Example |
 |---|---|---|
 | superscript $\mathrm{frz}$ | applies in frozen weeks | $m^{\mathrm{frz}}_{ET}$, $\phi^{\mathrm{frz}}$ |
-| superscript $\mathrm{eff}$ | after the frozen-week adjustment | $u^{\mathrm{eff}}$ |
+| superscript $\mathrm{eff}$ | after the frozen-week adjustment | $k_d^{\mathrm{eff}}$ |
 | subscript $t$ | week index, $t = 1, \dots, n_t$ | $S_t$ |
 | subscript $0$ | before the first week, $t = 0$ | $S_0$, the initial soil moisture |
 | superscript $\circ$ | nominal value, at the nominal clay content | $S_{\max}^{\circ}$, $\beta^{\circ}$, $C^{\circ}$ |
@@ -164,8 +162,8 @@ In code names the circle becomes the prefix `nominal_`, as in `nominal_soil_wate
 Places where this model departs from `[FAO56]`, and why.
 Each is deliberate.
 
-- **$ET_p$ is not `[FAO56]`'s $ET_c$.**
-  Potential evapotranspiration includes the uptake factor $u$, which has no `[FAO56]` counterpart, so $ET_p = u\,K_c\,ET_o$ (in an unfrozen week) differs from `[FAO56]`'s crop evapotranspiration $ET_c = K_c\,ET_o$.
+- **$ET_p$ is `[FAO56]`'s $ET_c$ only in an unfrozen week.**
+  Potential evapotranspiration is $ET_p = K_c\,ET_o^{\mathrm{eff}}$, which equals `[FAO56]`'s crop evapotranspiration $ET_c = K_c\,ET_o$ except in a frozen week, where $ET_o^{\mathrm{eff}} < ET_o$.
   It therefore has its own symbol.
 - **$K_s$ is the water-stress coefficient, not saturated hydraulic conductivity.**
   Soil physics often writes saturated hydraulic conductivity as $K_s$; this model has none and follows `[FAO56]`.

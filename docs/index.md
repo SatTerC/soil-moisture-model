@@ -8,7 +8,7 @@ icon: lucide/house
 A very simple bucket model of soil moisture, which partitions precipitation (weekly totals) into canopy interception, runoff, evapotranspiration, drainage and storage in a single soil water store.
 
 - Drivers: air temperature, precipitation and plant biomass at weekly resolution.
-- Site-specific parameters: elevation, soil clay content.
+- Site-specific parameters: elevation, soil texture (sand, clay and organic matter fractions).
 
 The model is intended as a component of the [SatTerC](https://github.com/SatTerC/satterc) terrestrial carbon modelling framework.
 It is written in plain numpy and vectorised over space.
@@ -56,16 +56,17 @@ out = simulate(
     precipitation,
     biomass,
     elevation=150.0,  # m
-    clay=25.0,  # percent
-    initial_soil_moisture=80.0,  # mm
+    sand=0.4,  # fraction by weight
+    clay=0.2,  # fraction by weight
 )
 
 print(out.soil_moisture.shape)  # (156,)
-print(out.soil.soil_water_capacity)  # mm, after the clay adjustment
+print(out.soil.soil_water_capacity)  # mm, from texture and rooting depth
+print(out.soil_water_content[-1])  # m3 m-3
 ```
 
 To run several pixels at once, add trailing axes.
-Here, three pixels share the climate but differ in clay content and soil water capacity:
+Here, three pixels share the climate but differ in clay content and rooting depth:
 
 ```python
 n_pixel = 3
@@ -74,8 +75,9 @@ block = simulate(
     np.repeat(precipitation[:, None], n_pixel, axis=1),
     np.repeat(biomass[:, None], n_pixel, axis=1),
     elevation=150.0,
-    clay=np.array([10.0, 25.0, 50.0]),
-    params=SoilWaterParams(nominal_soil_water_capacity=np.array([120.0, 160.0, 200.0])),
+    sand=0.4,
+    clay=np.array([0.1, 0.2, 0.4]),
+    params=SoilWaterParams(rooting_depth=np.array([0.5, 1.0, 1.5])),
 )
 
 print(block.soil_moisture.shape)  # (156, 3)

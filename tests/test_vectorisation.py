@@ -21,15 +21,15 @@ def block():
     precipitation = rng.gamma(1.5, 15.0, (N_TIME, N_PIXEL))
     biomass = rng.uniform(0.0, 600.0, (N_TIME, N_PIXEL))
     elevation = rng.uniform(0.0, 3000.0, N_PIXEL)
-    clay = rng.uniform(0.0, 90.0, N_PIXEL)
+    texture = (rng.uniform(0.1, 0.6, N_PIXEL), rng.uniform(0.05, 0.4, N_PIXEL))
     initial = rng.uniform(0.0, 200.0, N_PIXEL)
     params = SoilWaterParams(
-        nominal_soil_water_capacity=rng.uniform(60.0, 400.0, N_PIXEL),
+        rooting_depth=rng.uniform(0.2, 3.0, N_PIXEL),
+        depletion_fraction=rng.uniform(0.1, 0.8, N_PIXEL),
         runoff_exponent=rng.uniform(0.5, 4.0, N_PIXEL),
-        clay_sensitivity=rng.uniform(0.0, 0.1, N_PIXEL),
         biomass_half_saturation=rng.uniform(20.0, 800.0, N_PIXEL),
     )
-    return temperature, precipitation, biomass, elevation, clay, initial, params
+    return temperature, precipitation, biomass, elevation, texture, initial, params
 
 
 def _pixel(params: SoilWaterParams, i: int) -> SoilWaterParams:
@@ -42,12 +42,15 @@ def _pixel(params: SoilWaterParams, i: int) -> SoilWaterParams:
 
 
 def test_block_equals_stacked_pixels(block):
-    temperature, precipitation, biomass, elevation, clay, initial, params = block
+    temperature, precipitation, biomass, elevation, (sand, clay), initial, params = (
+        block
+    )
     together = simulate(
         temperature,
         precipitation,
         biomass,
         elevation,
+        sand,
         clay,
         initial_soil_moisture=initial,
         params=params,
@@ -58,6 +61,7 @@ def test_block_equals_stacked_pixels(block):
             precipitation[:, i],
             biomass[:, i],
             elevation[i],
+            sand[i],
             clay[i],
             initial_soil_moisture=initial[i],
             params=_pixel(params, i),
@@ -79,7 +83,7 @@ def test_block_equals_stacked_pixels(block):
 
 def test_scalar_site_inputs_broadcast(block):
     temperature, precipitation, biomass, *_ = block
-    out = simulate(temperature, precipitation, biomass, 100.0, 25.0)
+    out = simulate(temperature, precipitation, biomass, 100.0, 0.4, 0.2)
     assert out.soil_moisture.shape == (N_TIME, N_PIXEL)
 
 
@@ -90,16 +94,17 @@ def test_two_spatial_dimensions(block):
         precipitation.reshape(N_TIME, 1, N_PIXEL),
         biomass.reshape(N_TIME, 1, N_PIXEL),
         elevation=np.zeros((3, 1)),
-        clay=25.0,
+        sand=0.4,
+        clay=0.2,
     )
     assert out.soil_moisture.shape == (N_TIME, 3, N_PIXEL)
 
 
 def test_nan_pixel_does_not_contaminate_neighbours(block):
-    temperature, precipitation, biomass, elevation, clay, *_ = block
+    temperature, precipitation, biomass, elevation, texture, *_ = block
     precipitation = precipitation.copy()
     precipitation[10, 0] = np.nan
-    out = simulate(temperature, precipitation, biomass, elevation, clay)
+    out = simulate(temperature, precipitation, biomass, elevation, *texture)
     assert np.isnan(out.soil_moisture[-1, 0])
     assert np.all(np.isfinite(out.soil_moisture[:, 1:]))
 
@@ -107,4 +112,4 @@ def test_nan_pixel_does_not_contaminate_neighbours(block):
 def test_mismatched_time_dimension_raises(block):
     temperature, precipitation, biomass, *_ = block
     with pytest.raises(ValueError, match="leading"):
-        simulate(temperature, precipitation[:-1], biomass, 0.0, 25.0)
+        simulate(temperature, precipitation[:-1], biomass, 0.0, 0.4, 0.2)
